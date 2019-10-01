@@ -1,0 +1,4 @@
+- Determine correct algorithm for memory management
+- Determine metadata management
+- Create function to malloc using mmap
+- Free thanks to metadata
