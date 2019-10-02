@@ -3,6 +3,8 @@
 __attribute__((visibility("default")))
 void *malloc(size_t __attribute__((unused)) size)
 {
+    if (size == 0)
+        return NULL;
     return NULL;
 }
 
@@ -24,3 +26,4 @@ void *calloc(size_t __attribute__((unused)) nmemb,
 {
     return NULL;
 }
+
