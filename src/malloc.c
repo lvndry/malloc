@@ -38,12 +38,20 @@ void *malloc(size_t size)
     {
         return NULL;
     }
+    
+    size_t n = 1;
+
+    while (size >= PAGE_SIZE)
+    {
+        size -= PAGE_SIZE;
+        n++;
+    }
 
     static struct mem_block *base = NULL;
 
     if (base == NULL)
     {
-        base = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        base = mmap(NULL, n * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         base->size = size;
         base->is_available = 0;
         base->data = base + META_SIZE;
