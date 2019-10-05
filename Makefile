@@ -2,7 +2,7 @@ CFLAGS = -Wall -Wextra -Werror -pedantic -std=c99 -fPIC\
          -fvisibility=hidden -fno-builtin
 LDFLAGS = -shared
 TARGET_LIB = libmalloc.so
-OBJS = malloc.o
+OBJS = src/malloc.o
 CALL_LIB = libtracemalloc.so
 CALL_OBJS = call_trace.o
 

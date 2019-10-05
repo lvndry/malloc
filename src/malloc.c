@@ -2,6 +2,7 @@
 #include <sys/mman.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <stdio.h>
 
 #include "malloc.h"
 
@@ -18,7 +19,7 @@ static void split_block(struct mem_block *block)
     block->next = next;
 }
 
-static void find_block(struct mem_block *start, size_t size)
+static void *find_block(struct mem_block *start, size_t size)
 {
     struct mem_block *ptr = start;
 
@@ -54,8 +55,8 @@ void *malloc(size_t size)
         base = mmap(NULL, n * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         base->size = size;
         base->is_available = 0;
-        base->data = base + META_SIZE;
-        base->next = base->data + size;
+        base->data = (char*)(base + META_SIZE);
+        base->next = (void*)(base->data + size);
         split_block(base);
     }
     else
@@ -84,3 +85,27 @@ void *malloc(size_t size)
 // {
 //     return NULL;
 // }
+
+int main(void)
+{
+    printf("Test of malloc\n");
+    
+    char* str = malloc(10);
+    if (str == NULL)
+    {
+        printf("Failed to allocate memory..\n");
+        return 1;
+    }
+
+    printf("Address returned: %p\n", str);
+
+    char* more = malloc(100);
+    if (more == NULL)
+    {
+        printf("Failed to allocate memory..\n");
+        return 1;
+    }
+
+    printf("Address returned: %p\n", more);
+    return 0;
+}
