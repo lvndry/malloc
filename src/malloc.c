@@ -106,7 +106,6 @@ void *malloc(size_t size)
     }
     else
     {
-        first = NULL;
         last = find_block(first, &last, size);
         create_block(last, block, size);
     }
@@ -126,16 +125,22 @@ void *malloc(size_t size)
 //     return NULL;
 // }
 
-// __attribute__((visibility("default")))
-// void *calloc(size_t nmemb,
-//              size_t size)
-// {
-//     return NULL;
-// }
+ __attribute__((visibility("default")))
+void *calloc(size_t nmemb, size_t size)
+{
+    void *call = malloc(nmemb * size);
+    if (call == NULL)
+    {
+        return NULL;
+    }
+    call = memset(call, 0, size);
+    return call;
+}
 
 int main(void)
 {
     printf("Test of malloc..\n");
+
     char* str = (char*)malloc(10);
     if (str == NULL)
     {
