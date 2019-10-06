@@ -77,42 +77,6 @@ size_t getmappedsize(size_t size)
     return (n * PAGE_SIZE);
 }
 
-__attribute__((visibility("default")))
-void *malloc(size_t size)
-{
-    if (size == 0)
-    {
-        return NULL;
-    }
-
-    // size_t aligned_size = align(size);
-
-    static void *first;
-    struct mem_block *last = NULL;
-    struct mem_block *block = NULL;
-    first = NULL;
-
-    if (first == NULL)
-    {
-        size_t map_size = getmappedsize(size);
-        block = getPage(NULL, map_size);
-        if (block == NULL)
-        {
-            return NULL;
-        }
-
-        create_block(last, block, size);
-        first = block;
-    }
-    else
-    {
-        last = find_block(first, &last, size);
-        create_block(last, block, size);
-    }
-
-    return (void*)block->data;
-}
-
 // __attribute__((visibility("default")))
 // void free(void *ptr)
 // {
@@ -137,17 +101,49 @@ void *calloc(size_t nmemb, size_t size)
     return call;
 }
 
+void *alloc(size_t size)
+{
+    if (size == 0)
+    {
+        return NULL;
+    }
+
+    static void *first = NULL;
+    struct mem_block *last = NULL;
+    struct mem_block *block = NULL;
+
+    if (first == NULL)
+    {
+        size_t map_size = getmappedsize(size);
+        block = getPage(NULL, map_size);
+        if (block == NULL)
+        {
+            return NULL;
+        }
+
+        create_block(last, block, size);
+        first = block;
+    }
+    else
+    {
+        last = find_block(first, &last, size);
+        create_block(last, block, size);
+    }
+
+    return (void*)block->data;
+}
+
 int main(void)
 {
     printf("Test of malloc..\n");
 
-    char* str = (char*)malloc(10);
+    char* str = (char*)alloc(10);
     if (str == NULL)
     {
         printf("Failed to allocate memory..\n");
     }
 
-    printf("Address returned: %p\n", str);
+    printf("str: Address returned: %p\n", str);
 
     char* more = malloc(100);
     if (more == NULL)
@@ -155,6 +151,6 @@ int main(void)
         printf("Failed to allocate memory..\n");
     }
 
-    printf("Address returned: %p\n", more);
+    printf("more: Address returned: %p\n", more);
     return 0;
 }
