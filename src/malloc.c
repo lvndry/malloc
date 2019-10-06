@@ -26,9 +26,9 @@ void *find_block(struct mem_block *start, size_t size)
     return ptr;
 }
 
-void split_block(struct mem_block *block)
+void split_block(struct mem_block *block, size_t size)
 {
-    struct mem_block *next = NULL;
+    struct mem_block *next = (struct mem_block*)(block->data + size);
     next->size = PAGE_SIZE - block->size - META_SIZE;
     next->is_available = 1;
     next->next = block->next;
@@ -36,7 +36,7 @@ void split_block(struct mem_block *block)
     block->next = next;
 }
 
-void *create_block(struct mem_block *last, struct mem_block *block, size_t size)
+void create_block(struct mem_block *last, struct mem_block *block, size_t size)
 {
     block->size = size;
     block->is_available = 0;
@@ -47,19 +47,17 @@ void *create_block(struct mem_block *last, struct mem_block *block, size_t size)
     {
         last->next = block;
     }
-
-    return block;
 }
 
 struct mem_block *getPage(struct mem_block *last, size_t map_size)
 {
-    struct mem_block *page = mmap(last, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (page == MAP_FAILED)
+    struct mem_block *mapped_page = mmap(last, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (mapped_page == MAP_FAILED)
     {
         return NULL;
     }
     
-    return page;
+    return mapped_page;
 }
 
 size_t getmappedsize(size_t size)
@@ -76,34 +74,6 @@ size_t getmappedsize(size_t size)
     return n * PAGE_SIZE;
 }
 
-static void *alloc(size_t size)
-{
-    size_t aligned_size = align(size);
-
-    static struct mem_block *init = NULL;
-    struct mem_block *last = NULL;
-    struct mem_block *block = NULL;
-
-    if (init == NULL)
-    {
-        size_t map_size = getmappedsize(size);
-        block = getPage(NULL, map_size);
-        if (block == NULL)
-        {
-            return NULL;
-        }
-        create_block(last, block, aligned_size);
-        init = block;
-    }
-    else
-    {
-        block = find_block(init, size);
-        split_block(block);
-    }
-
-    return (void*)block->data;
-}
-
 __attribute__((visibility("default")))
 void *malloc(size_t size)
 {
@@ -111,7 +81,32 @@ void *malloc(size_t size)
     {
         return NULL;
     }
-    return alloc(size);
+
+    size_t aligned_size = align(size);
+
+    static void *first = NULL;
+    struct mem_block *last = NULL;
+    struct mem_block *block = NULL;
+
+    if (first == NULL)
+    {
+        size_t map_size = getmappedsize(size);
+        block = getPage(NULL, map_size);
+        if (block == NULL)
+        {
+            return NULL;
+        }
+
+        create_block(last, block, size);
+        first = block;
+    }
+    else
+    {
+        printf("Address of first %p\n", first);
+        return NULL;
+    }
+
+    return (void*)block->data;
 }
 
 // __attribute__((visibility("default")))
