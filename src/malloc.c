@@ -6,7 +6,6 @@
 
 #include "malloc.h"
 
-#define align (((((x) - 1) >> 2) << 2) + 4)
 #define META_SIZE sizeof(struct mem_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
@@ -19,11 +18,15 @@ static void split_block(struct mem_block *block)
     block->next = next;
 }
 
+inline size_t align(size_t n) {
+  return (n + sizeof(intptr_t) - 1) & ~(sizeof(intptr_t) - 1);
+}
+
 static void *find_block(struct mem_block *start, size_t size)
 {
     struct mem_block *ptr = start;
 
-    while (ptr && !(ptr->next && ptr->size >= size))
+    while (ptr && !(ptr->is_available && ptr->size >= size))
     {
         *start = *ptr;
         ptr = ptr->next;
@@ -32,6 +35,40 @@ static void *find_block(struct mem_block *start, size_t size)
     return ptr;
 }
 
+static void create_block(struct mem_block *last, struct mem_block *block, size_t size)
+{
+        block->size = size;
+        block->is_available = 0;
+        block->data = (char*)(block + META_SIZE);
+        block->next = NULL;
+        split_block(block);
+        if (last != NULL)
+        {
+            last->next = block;
+        }
+}
+
+static struct mem_block *getPage(struct mem_block *last, size_t map_size)
+{
+        struct mem_block *base = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (base == MAP_FAILED)
+        {
+            return NULL;
+        }
+        return base;
+}
+
+static size_t getmappedsize(size_t size)
+{
+    size_t n = 1;
+    while (size >= PAGE_SIZE)
+    {
+        size -= PAGE_SIZE;
+        n++;
+    }
+
+    return n * PAGE_SIZE;
+}
 __attribute__((visibility("default")))
 void *malloc(size_t size)
 {
@@ -40,28 +77,24 @@ void *malloc(size_t size)
         return NULL;
     }
     
-    size_t n = 1;
-
-    while (size >= PAGE_SIZE)
-    {
-        size -= PAGE_SIZE;
-        n++;
-    }
+    size = align(size);
 
     static struct mem_block *base = NULL;
-
+    static struct mem_block *last = NULL;
+    
     if (base == NULL)
     {
-        base = mmap(NULL, n * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        base->size = size;
-        base->is_available = 0;
-        base->data = (char*)(base + META_SIZE);
-        base->next = (void*)(base->data + size);
-        split_block(base);
+        size_t map_size = getmappedsize(size);
+        base = getPage(NULL, map_size);
+        if (base == NULL)
+        {
+            return NULL;
+        }
+        create_block(last, base, size);
     }
     else
     {
-        find_block(base, size);
+        base = find_block(base, size);
     }
 
     return (void*)base->data;
@@ -99,13 +132,13 @@ int main(void)
 
     printf("Address returned: %p\n", str);
 
-    char* more = malloc(100);
-    if (more == NULL)
-    {
-        printf("Failed to allocate memory..\n");
-        return 1;
-    }
+    // char* more = malloc(100);
+    // if (more == NULL)
+    // {
+    //     printf("Failed to allocate memory..\n");
+    //     return 1;
+    // }
 
-    printf("Address returned: %p\n", more);
-    return 0;
+    // printf("Address returned: %p\n", more);
+    // return 0;
 }
