@@ -9,20 +9,11 @@
 #define META_SIZE sizeof(struct mem_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
-static void split_block(struct mem_block *block)
-{
-    struct mem_block *next = block->next;
-    next->size = PAGE_SIZE - block->size;
-    next->is_available = 1;
-    next->next = block->next;
-    block->next = next;
+size_t align(size_t n) {
+    return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
 }
 
-inline size_t align(size_t n) {
-  return (n + sizeof(intptr_t) - 1) & ~(sizeof(intptr_t) - 1);
-}
-
-static void *find_block(struct mem_block *start, size_t size)
+void *find_block(struct mem_block *start, size_t size)
 {
     struct mem_block *ptr = start;
 
@@ -35,40 +26,84 @@ static void *find_block(struct mem_block *start, size_t size)
     return ptr;
 }
 
-static void create_block(struct mem_block *last, struct mem_block *block, size_t size)
+void split_block(struct mem_block *block)
 {
-        block->size = size;
-        block->is_available = 0;
-        block->data = (char*)(block + META_SIZE);
-        block->next = NULL;
-        split_block(block);
-        if (last != NULL)
-        {
-            last->next = block;
-        }
+    struct mem_block *next = NULL;
+    next->size = PAGE_SIZE - block->size - META_SIZE;
+    next->is_available = 1;
+    next->next = block->next;
+    next->data = block->data + block->size + META_SIZE;
+    block->next = next;
 }
 
-static struct mem_block *getPage(struct mem_block *last, size_t map_size)
+void *create_block(struct mem_block *last, struct mem_block *block, size_t size)
 {
-        struct mem_block *base = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (base == MAP_FAILED)
-        {
-            return NULL;
-        }
-        return base;
+    block->size = size;
+    block->is_available = 0;
+    block->data = (char*)(block + META_SIZE);
+    block->next = NULL;
+
+    if (last != NULL)
+    {
+        last->next = block;
+    }
+
+    return block;
 }
 
-static size_t getmappedsize(size_t size)
+struct mem_block *getPage(struct mem_block *last, size_t map_size)
+{
+    struct mem_block *page = mmap(last, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (page == MAP_FAILED)
+    {
+        return NULL;
+    }
+    
+    return page;
+}
+
+size_t getmappedsize(size_t size)
 {
     size_t n = 1;
-    while (size >= PAGE_SIZE)
+    size_t len = PAGE_SIZE;
+
+    while (size >= len)
     {
-        size -= PAGE_SIZE;
+        size -= len;
         n++;
     }
 
     return n * PAGE_SIZE;
 }
+
+static void *alloc(size_t size)
+{
+    size_t aligned_size = align(size);
+
+    static struct mem_block *init = NULL;
+    struct mem_block *last = NULL;
+    struct mem_block *block = NULL;
+
+    if (init == NULL)
+    {
+        size_t map_size = getmappedsize(size);
+        block = getPage(NULL, map_size);
+        if (block == NULL)
+        {
+            return NULL;
+        }
+        create_block(last, block, aligned_size);
+        init = block;
+    }
+    else
+    {
+        block = find_block(init, size);
+        split_block(block);
+    }
+
+    return (void*)block->data;
+}
+
 __attribute__((visibility("default")))
 void *malloc(size_t size)
 {
@@ -76,28 +111,7 @@ void *malloc(size_t size)
     {
         return NULL;
     }
-    
-    size = align(size);
-
-    static struct mem_block *base = NULL;
-    static struct mem_block *last = NULL;
-    
-    if (base == NULL)
-    {
-        size_t map_size = getmappedsize(size);
-        base = getPage(NULL, map_size);
-        if (base == NULL)
-        {
-            return NULL;
-        }
-        create_block(last, base, size);
-    }
-    else
-    {
-        base = find_block(base, size);
-    }
-
-    return (void*)base->data;
+    return alloc(size);
 }
 
 // __attribute__((visibility("default")))
@@ -121,8 +135,8 @@ void *malloc(size_t size)
 
 int main(void)
 {
-    printf("Test of malloc\n");
-    
+    printf("Test of malloc..\n");
+
     char* str = malloc(10);
     if (str == NULL)
     {
