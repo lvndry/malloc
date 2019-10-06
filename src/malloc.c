@@ -1,7 +1,9 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
-#include <stddef.h>
+#include <stdint.h>
+#include <pthread.h>
 #include <unistd.h>
+#include <stddef.h>
 #include <stdio.h>
 
 #include "malloc.h"
@@ -13,13 +15,13 @@ size_t align(size_t n) {
     return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
 }
 
-void *find_block(struct mem_block *start, size_t size)
+void *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
 
     while (ptr && !(ptr->is_available && ptr->size >= size))
     {
-        *start = *ptr;
+        **last = *ptr;
         ptr = ptr->next;
     }
 
@@ -71,7 +73,7 @@ size_t getmappedsize(size_t size)
         n++;
     }
 
-    return n * PAGE_SIZE;
+    return (n * PAGE_SIZE);
 }
 
 __attribute__((visibility("default")))
@@ -102,8 +104,8 @@ void *malloc(size_t size)
     }
     else
     {
-        printf("Address of first %p\n", first);
-        return NULL;
+        last = find_block(first, last, size);
+        create_block(last, block, size);
     }
 
     return (void*)block->data;
