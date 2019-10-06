@@ -1,10 +1,11 @@
 #define _GNU_SOURCE
-#include <sys/mman.h>
-#include <stdint.h>
 #include <pthread.h>
-#include <unistd.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "malloc.h"
 
@@ -84,11 +85,12 @@ void *malloc(size_t size)
         return NULL;
     }
 
-    size_t aligned_size = align(size);
+    // size_t aligned_size = align(size);
 
-    static void *first = NULL;
+    static void *first;
     struct mem_block *last = NULL;
     struct mem_block *block = NULL;
+    first = NULL;
 
     if (first == NULL)
     {
@@ -104,7 +106,8 @@ void *malloc(size_t size)
     }
     else
     {
-        last = find_block(first, last, size);
+        first = NULL;
+        last = find_block(first, &last, size);
         create_block(last, block, size);
     }
 
@@ -133,23 +136,20 @@ void *malloc(size_t size)
 int main(void)
 {
     printf("Test of malloc..\n");
-
-    char* str = malloc(10);
+    char* str = (char*)malloc(10);
     if (str == NULL)
     {
         printf("Failed to allocate memory..\n");
-        return 1;
     }
 
     printf("Address returned: %p\n", str);
 
-    // char* more = malloc(100);
-    // if (more == NULL)
-    // {
-    //     printf("Failed to allocate memory..\n");
-    //     return 1;
-    // }
+    char* more = malloc(100);
+    if (more == NULL)
+    {
+        printf("Failed to allocate memory..\n");
+    }
 
-    // printf("Address returned: %p\n", more);
-    // return 0;
+    printf("Address returned: %p\n", more);
+    return 0;
 }
