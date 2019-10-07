@@ -31,7 +31,7 @@ size_t align(size_t n) {
 static void *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
-    while (ptr && !(ptr->is_available && ptr->size >= size))
+    while (ptr != NULL && !(ptr->is_available && ptr->size >= size))
     {
         **last = *ptr;
         ptr = ptr->next;
@@ -42,8 +42,8 @@ static void *find_block(struct mem_block *start, struct mem_block **last, size_t
 
 static void split_block(struct mem_block *block, size_t size)
 {
-    struct mem_block *next = (struct mem_block*)(block->data + size);
-    next->size = PAGE_SIZE - block->size - META_SIZE;
+    struct mem_block *next = (void*)(block->data + size);
+    next->size = PAGE_SIZE - block->size - size - META_SIZE;
     next->is_available = 1;
     next->next = block->next;
     next->data = block->data + block->size + META_SIZE;
@@ -70,7 +70,7 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
     {
         return NULL;
     }
-    
+
     return mapped_page;
 }
 
@@ -88,6 +88,7 @@ static size_t getmappedsize(size_t size)
     return (n * PAGE_SIZE);
 }
 
+ __attribute__((visibility("default")))
 void *alloc(size_t size)
 {
     if (size == 0)
@@ -95,6 +96,7 @@ void *alloc(size_t size)
         return NULL;
     }
 
+    int aligned_size = align(size);
     static void *first = NULL;
     struct mem_block *last = NULL;
     struct mem_block *block = NULL;
@@ -109,19 +111,37 @@ void *alloc(size_t size)
         }
 
         create_block(last, block, size);
+        split_block(block, aligned_size);
         first = block;
     }
     else
     {
-        last = find_block(first, &last, size);
-        create_block(last, block, size);
+        last = first;
+        block = find_block(first, &last, size);
+        if (block != NULL)
+        {
+            if (block->size >= META_SIZE + 4)
+            {
+                split_block(block, aligned_size);
+            }
+        }
+        else
+        {
+            block = getPage(last, aligned_size);
+            size_t map_size = getmappedsize(size);
+            block = getPage(NULL, map_size);
+            if (block == NULL)
+            {
+                return NULL;
+            }
+        }
     }
 
     return (void*)block->data;
 }
 
  __attribute__((visibility("default")))
-static void *calloc(size_t nmemb, size_t size)
+void *calloc(size_t nmemb, size_t size)
 {
     void *call = alloc(nmemb * size);
     if (call == NULL)
