@@ -88,7 +88,6 @@ static size_t getmappedsize(size_t size)
     return (n * PAGE_SIZE);
 }
 
- __attribute__((visibility("default")))
 void *alloc(size_t size)
 {
     if (size == 0)
@@ -138,6 +137,12 @@ void *alloc(size_t size)
     }
 
     return (void*)block->data;
+}
+
+ __attribute__((visibility("default")))
+void *malloc(size_t size)
+{
+    return alloc(size);
 }
 
  __attribute__((visibility("default")))
