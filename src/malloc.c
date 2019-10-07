@@ -170,5 +170,14 @@ int main(void)
     }
     printf("more: Address returned: %p\n", more);
 
+    int* callouc = (int*)calloc(5, sizeof(int));
+    if (callouc == NULL)
+    {
+        printf("Failed to allocate memory..\n");
+    }
+
+    printf("callouc: Address returned: %p --- ", callouc);
+    printf("callouc[0]: %d\n", callouc[0]);
+
     return 0;
 }

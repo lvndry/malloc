@@ -2,3 +2,4 @@
 - Determine metadata management
 - Create function to malloc using mmap
 - Free thanks to metadata
+- Determine a better way to calculate remaining size
