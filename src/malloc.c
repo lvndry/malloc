@@ -12,19 +12,30 @@
 #define META_SIZE sizeof(struct mem_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
-// __attribute__((visibility("default")))
-// void free(void *ptr)
-// {
-// }
+__attribute__((visibility("default")))
+void free(void *ptr)
+{
+    struct mem_block *to_free = ptr - META_SIZE;
+    to_free->is_available = 1;
+}
 
-// __attribute__((visibility("default")))
-// void *realloc(void *ptr,
-//              size_t size)
-// {
-//     return NULL;
-// }
+__attribute__((visibility("default")))
+void *realloc(void *ptr, size_t size)
+{
+    if (ptr == NULL)
+    {
+        return malloc(size);
+    }
 
-size_t align(size_t n) {
+    if (size == 0)
+    {
+        return ptr;
+    }
+
+    return NULL;
+}
+
+static size_t align(size_t n) {
     return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
 }
 
