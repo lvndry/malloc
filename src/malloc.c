@@ -31,8 +31,9 @@ void *realloc(void *ptr, size_t size)
     {
         return ptr;
     }
-
-    return NULL;
+    struct mem_block *meta = ptr - META_SIZE;
+    meta->size += size;
+    return ptr;
 }
 
 static size_t align(size_t n) {
