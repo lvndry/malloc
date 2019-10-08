@@ -15,8 +15,15 @@
 __attribute__((visibility("default")))
 void free(void *ptr)
 {
-    struct mem_block *to_free = ptr - META_SIZE;
-    to_free->is_available = 1;
+    if (ptr == NULL)
+    {
+        return;
+    }
+
+    if (is_adress_valid(ptr)) {
+        struct mem_block *to_free = ptr - META_SIZE;
+        to_free->is_available = 1;
+    }
 }
 
 __attribute__((visibility("default")))
@@ -31,13 +38,21 @@ void *realloc(void *ptr, size_t size)
     {
         return ptr;
     }
+
     struct mem_block *meta = ptr - META_SIZE;
     meta->size += size;
+
     return ptr;
 }
 
 static size_t align(size_t n) {
     return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
+}
+
+static int is_adress_valid(void *ptr)
+{
+    struct mem_block *meta = ptr - META_SIZE;
+    return meta->data == ptr;
 }
 
 static void *find_block(struct mem_block *start, struct mem_block **last, size_t size)
@@ -77,10 +92,16 @@ static void create_block(struct mem_block *last, struct mem_block *block, size_t
 
 static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 {
-    struct mem_block *mapped_page = mmap(last, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    struct mem_block *mapped_page = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (mapped_page == MAP_FAILED)
     {
         return NULL;
+    }
+
+    if (last != NULL)
+    {
+        last->next = mapped_page;
+        return last;
     }
 
     return mapped_page;
@@ -114,24 +135,24 @@ static void *alloc(size_t size)
 
     if (first == NULL)
     {
-        size_t map_size = getmappedsize(size);
+        size_t map_size = getmappedsize(aligned_size);
         block = getPage(NULL, map_size);
         if (block == NULL)
         {
             return NULL;
         }
 
-        create_block(last, block, size);
+        create_block(last, block, aligned_size);
         split_block(block, aligned_size);
         first = block;
     }
     else
     {
         last = first;
-        block = find_block(first, &last, size);
+        block = find_block(first, &last, aligned_size);
         if (block != NULL)
         {
-            if (block->size >= META_SIZE + 4)
+            if ((block->size - aligned_size) >= META_SIZE + 4)
             {
                 split_block(block, aligned_size);
             }
@@ -139,7 +160,7 @@ static void *alloc(size_t size)
         else
         {
             block = getPage(last, aligned_size);
-            size_t map_size = getmappedsize(size);
+            size_t map_size = getmappedsize(aligned_size);
             block = getPage(NULL, map_size);
             if (block == NULL)
             {
