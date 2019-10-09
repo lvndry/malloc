@@ -253,14 +253,14 @@ int main(void)
 {
     printf("Test of malloc..\n");
 
-    char* str = (char*)malloc(10);
+    char* str = (char*)malloc(30);
     if (str == NULL)
     {
         printf("Failed to allocate memory..\n");
     }
     printf("str: Address returned: %p\n", str);
 
-    char* more = (char*)malloc(100);
+    char* more = (char*)malloc(2000);
     if (more == NULL)
     {
         printf("Failed to allocate memory..\n");
