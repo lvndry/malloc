@@ -71,10 +71,10 @@ static void *find_block(struct mem_block *start, struct mem_block **last, size_t
     return ptr;
 }
 
-static void split_block(struct mem_block *block, size_t size)
+static void split_block(struct mem_block *block, size_t free_size)
 {
-    struct mem_block *next = (void*)(block->data + size);
-    next->size = PAGE_SIZE - block->size - size - META_SIZE;
+    struct mem_block *next = (void*)(block->data + block->size);
+    next->size = free_size - block->size - META_SIZE;
     next->is_available = 1;
     next->next = block->next;
     next->data = block->data + block->size + META_SIZE;
@@ -132,7 +132,7 @@ static void *alloc(size_t size)
         return NULL;
     }
 
-    int aligned_size = align(size);
+    size_t aligned_size = align(size);
     static void *first = NULL;
     struct mem_block *last = NULL;
     struct mem_block *block = NULL;
@@ -147,7 +147,7 @@ static void *alloc(size_t size)
         }
 
         create_block(last, block, aligned_size);
-        split_block(block, aligned_size);
+        split_block(block, PAGE_SIZE);
         first = block;
     }
     else
@@ -158,12 +158,13 @@ static void *alloc(size_t size)
         {
             if ((block->size - aligned_size) >= META_SIZE + 4)
             {
-                split_block(block, aligned_size);
+                size_t remaining = block->size;
+                create_block(last, block, aligned_size);
+                split_block(block, remaining);
             }
         }
         else
         {
-            block = getPage(last, aligned_size);
             size_t map_size = getmappedsize(aligned_size);
             block = getPage(NULL, map_size);
             if (block == NULL)
@@ -176,16 +177,16 @@ static void *alloc(size_t size)
     return (void*)block->data;
 }
 
- __attribute__((visibility("default")))
+/* __attribute__((visibility("default")))
 void *malloc(size_t size)
 {
     return alloc(size);
-}
+}*/
 
  __attribute__((visibility("default")))
 void *calloc(size_t nmemb, size_t size)
 {
-    void *call = malloc(nmemb * size);
+    void *call = alloc(nmemb * size);
     if (call == NULL)
     {
         return NULL;
@@ -195,7 +196,7 @@ void *calloc(size_t nmemb, size_t size)
 }
 
 __attribute__((visibility("default")))
-void *realloc(void *ptr, size_t size)
+void *my_realloc(void *ptr, size_t size)
 {
     if (ptr == NULL)
     {
@@ -242,7 +243,8 @@ void free(void *ptr)
         return;
     }
 
-    if (is_adress_valid(ptr)) {
+    if (is_adress_valid(ptr))
+    {
         void *addr = get_meta(ptr);
         struct mem_block *to_free = addr;
         to_free->is_available = 1;
@@ -251,32 +253,32 @@ void free(void *ptr)
 
 int main(void)
 {
-    printf("Test of malloc..\n");
-
-    char* str = (char*)malloc(30);
+    char *str = (char*)alloc(2000);
     if (str == NULL)
     {
-        printf("Failed to allocate memory..\n");
+        printf("str: Failed to allocate memory..\n");
     }
-    printf("str: Address returned: %p\n", str);
 
-    char* more = (char*)malloc(2000);
+    // printf("str: Address returned: %p\n", str);
+
+    char *more = (char*)alloc(2000);
     if (more == NULL)
     {
-        printf("Failed to allocate memory..\n");
+        printf("more: Failed to allocate memory..\n");
     }
+    /*
     printf("more: Address returned: %p\n", more);
 
-    str = (char*)realloc(str, 5);
+    str = (char*)my_realloc(str, 5);
     if (str == NULL)
     {
         printf("Failed to reallocate memory..\n");
     }
-
     printf("str: Address returned: %p\n", str);
 
     free(str);
     free(more);
+    */
 
     return 0;
 }
