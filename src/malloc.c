@@ -12,41 +12,26 @@
 #define META_SIZE sizeof(struct mem_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
-__attribute__((visibility("default")))
-void free(void *ptr)
-{
-    if (ptr == NULL)
-    {
-        return;
-    }
+static size_t align(size_t n);
+static void *alloc(size_t size);
+static void create_block(struct mem_block *last, struct mem_block *block, size_t size);
+static void *find_block(struct mem_block *start, struct mem_block **last, size_t size);
+static size_t getmappedsize(size_t size);
+static struct mem_block *getPage(struct mem_block *last, size_t map_size);
+static int is_adress_valid(void *ptr);
+void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
+static void split_block(struct mem_block *block, size_t size);
 
-    if (is_adress_valid(ptr)) {
-        struct mem_block *to_free = ptr - META_SIZE;
-        to_free->is_available = 1;
-    }
+void move_data(struct mem_block *block, struct mem_block *dest, size_t size)
+{
+    struct mem_block *src = block->next;
+    memmove(src, dest, size);
+    block->size += size;
+    block->data += size;
 }
 
-__attribute__((visibility("default")))
-void *realloc(void *ptr, size_t size)
+static size_t align(size_t n)
 {
-    if (ptr == NULL)
-    {
-        return malloc(size);
-    }
-
-    if (size == 0)
-    {
-        free(ptr);
-        return ptr;
-    }
-
-    struct mem_block *meta = ptr - META_SIZE;
-    meta->size += size;
-
-    return ptr;
-}
-
-static size_t align(size_t n) {
     return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
 }
 
@@ -191,30 +176,84 @@ void *calloc(size_t nmemb, size_t size)
     return call;
 }
 
-int main(void)
+__attribute__((visibility("default")))
+void *realloc(void *ptr, size_t size)
 {
-    printf("Test of malloc..\n");
-
-    char* str = (char*)malloc(10);
-    if (str == NULL)
+    if (ptr == NULL)
     {
-        printf("Failed to allocate memory..\n");
+        return malloc(size);
     }
-    printf("str: Address returned: %p\n", str);
 
-    char* more = (char*)malloc(100);
-    if (more == NULL)
+    if (size == 0)
     {
-        printf("Failed to allocate memory..\n");
+        free(ptr);
+        return ptr;
     }
-    printf("more: Address returned: %p\n", more);
 
-    int* callouc = (int*)calloc(5, sizeof(int));
-    if (callouc == NULL)
+    struct mem_block *meta = ptr - META_SIZE;
+    size_t aligned_size = align(size);
+    struct mem_block *last = ptr;
+    struct mem_block *next_free = find_block(ptr, &last, aligned_size);
+
+    if (next_free != NULL)
     {
-        printf("Failed to allocate memory..\n");
+        if (meta->next == next_free)
+        {
+            meta->size += aligned_size;
+            next_free += aligned_size;
+        }
+        else
+        {
+            move_data(ptr, next_free, aligned_size);
+        }
     }
-    printf("callouc[0]: %d\n", callouc[0]);
+    else
+    {
+        struct mem_block *dest = getPage(NULL, aligned_size);
+        move_data(ptr, dest, aligned_size);
+    }
 
-    return 0;
+    return ptr;
 }
+
+__attribute__((visibility("default")))
+void free(void *ptr)
+{
+    if (ptr == NULL)
+    {
+        return;
+    }
+
+    if (is_adress_valid(ptr)) {
+        struct mem_block *to_free = ptr - META_SIZE;
+        to_free->is_available = 1;
+    }
+}
+
+// int main(void)
+// {
+//     printf("Test of malloc..\n");
+
+//     char* str = (char*)malloc(10);
+//     if (str == NULL)
+//     {
+//         printf("Failed to allocate memory..\n");
+//     }
+//     printf("str: Address returned: %p\n", str);
+
+//     char* more = (char*)malloc(100);
+//     if (more == NULL)
+//     {
+//         printf("Failed to allocate memory..\n");
+//     }
+//     printf("more: Address returned: %p\n", more);
+
+//     int* callouc = (int*)calloc(5, sizeof(int));
+//     if (callouc == NULL)
+//     {
+//         printf("Failed to allocate memory..\n");
+//     }
+//     printf("callouc[0]: %d\n", callouc[0]);
+
+//     return 0;
+// }
