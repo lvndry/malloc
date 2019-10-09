@@ -22,12 +22,24 @@ static int is_adress_valid(void *ptr);
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
 static void split_block(struct mem_block *block, size_t size);
 
+// TO REMOVE BEFORE PUSH TO PROD
+// static void print_block(struct mem_block *block)
+// {
+//     printf("Block address: %p\n", (void*)block);
+//     printf("Block size: %ld\n", block->size);
+//     printf("Block availability: %d\n", block->is_available);
+//     printf("Block data: %p\n", block->data);
+//     printf("Block next: %p\n", (void*)block->next);
+//     printf("\n");
+// }
+
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size)
 {
     struct mem_block *src = block->next;
     memmove(src, dest, size);
     block->size += size;
     block->data += size;
+    dest->size -= size;
 }
 
 static size_t align(size_t n)
@@ -35,10 +47,16 @@ static size_t align(size_t n)
     return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
 }
 
+static void *get_meta(void *ptr)
+{
+    return (char*)ptr - META_SIZE;
+}
+
 static int is_adress_valid(void *ptr)
 {
-    struct mem_block *meta = ptr - META_SIZE;
-    return meta->data == ptr;
+    void *addr = get_meta(ptr);
+    struct mem_block *meta = addr;
+    return (void*)meta->data == (void*)ptr;
 }
 
 static void *find_block(struct mem_block *start, struct mem_block **last, size_t size)
@@ -190,11 +208,11 @@ void *realloc(void *ptr, size_t size)
         return ptr;
     }
 
-    struct mem_block *meta = ptr - META_SIZE;
+    void *addr = get_meta(ptr);
+    struct mem_block *meta = addr;
     size_t aligned_size = align(size);
-    struct mem_block *last = ptr;
-    struct mem_block *next_free = find_block(ptr, &last, aligned_size);
-
+    struct mem_block *last = meta;
+    struct mem_block *next_free = find_block(meta, &last, aligned_size);
     if (next_free != NULL)
     {
         if (meta->next == next_free)
@@ -204,13 +222,13 @@ void *realloc(void *ptr, size_t size)
         }
         else
         {
-            move_data(ptr, next_free, aligned_size);
+            move_data(meta, next_free, aligned_size);
         }
     }
     else
     {
         struct mem_block *dest = getPage(NULL, aligned_size);
-        move_data(ptr, dest, aligned_size);
+        move_data(meta, dest, aligned_size);
     }
 
     return ptr;
@@ -225,35 +243,40 @@ void free(void *ptr)
     }
 
     if (is_adress_valid(ptr)) {
-        struct mem_block *to_free = ptr - META_SIZE;
+        void *addr = get_meta(ptr);
+        struct mem_block *to_free = addr;
         to_free->is_available = 1;
     }
 }
 
-// int main(void)
-// {
-//     printf("Test of malloc..\n");
+int main(void)
+{
+    printf("Test of malloc..\n");
 
-//     char* str = (char*)malloc(10);
-//     if (str == NULL)
-//     {
-//         printf("Failed to allocate memory..\n");
-//     }
-//     printf("str: Address returned: %p\n", str);
+    char* str = (char*)malloc(10);
+    if (str == NULL)
+    {
+        printf("Failed to allocate memory..\n");
+    }
+    printf("str: Address returned: %p\n", str);
 
-//     char* more = (char*)malloc(100);
-//     if (more == NULL)
-//     {
-//         printf("Failed to allocate memory..\n");
-//     }
-//     printf("more: Address returned: %p\n", more);
+    char* more = (char*)malloc(100);
+    if (more == NULL)
+    {
+        printf("Failed to allocate memory..\n");
+    }
+    printf("more: Address returned: %p\n", more);
 
-//     int* callouc = (int*)calloc(5, sizeof(int));
-//     if (callouc == NULL)
-//     {
-//         printf("Failed to allocate memory..\n");
-//     }
-//     printf("callouc[0]: %d\n", callouc[0]);
+    str = (char*)realloc(str, 5);
+    if (str == NULL)
+    {
+        printf("Failed to reallocate memory..\n");
+    }
 
-//     return 0;
-// }
+    printf("str: Address returned: %p\n", str);
+
+    free(str);
+    free(more);
+
+    return 0;
+}
