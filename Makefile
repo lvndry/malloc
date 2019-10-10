@@ -4,7 +4,7 @@ LDFLAGS = -shared
 TARGET_LIB = libmalloc.so
 OBJS = src/malloc.o
 CALL_LIB = libtracemalloc.so
-CALL_OBJS = call_trace.o
+CALL_OBJS = test/call_trace.o
 
 .PHONY: all ${TARGET_LIB} $(CALL_LIB) trace clean
 
@@ -17,7 +17,7 @@ trace: $(CALL_LIB)
 
 CFLAGS = -g -fPIC -ldl
 $(CALL_LIB): $(CALL_OBJS)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) -g ${CFLAGS} $(LDFLAGS) -fPIC -o $@ $^
 
 clean:
 	${RM} ${TARGET_LIB} $(CALL_LIB) ${OBJS} $(CALL_OBJS)

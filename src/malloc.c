@@ -183,13 +183,13 @@ static void *alloc(size_t size)
     return (void*)block->data;
 }
 
-/* __attribute__((visibility("default")))
+__attribute__((visibility("default")))
 void *malloc(size_t size)
 {
     return alloc(size);
-}*/
+}
 
- __attribute__((visibility("default")))
+/*  __attribute__((visibility("default")))
 void *calloc(size_t nmemb, size_t size)
 {
     void *call = alloc(nmemb * size);
@@ -240,7 +240,9 @@ void *my_realloc(void *ptr, size_t size)
 
     return ptr;
 }
+*/
 
+/*
 __attribute__((visibility("default")))
 void free(void *ptr)
 {
@@ -256,10 +258,11 @@ void free(void *ptr)
         to_free->is_available = 1;
     }
 }
+*/
 
-int main(void)
+/* int main(void)
 {
-    for (int i = 0; i < 5000; i++)
+    for (int i = 0; i < 50000; i++)
     {
         int *n = alloc(100);
         if (n == NULL)
@@ -268,7 +271,7 @@ int main(void)
         }
         printf("malloc %d\n", i);
     }
-    /*
+
     printf("more: Address returned: %p\n", more);
 
     str = (char*)my_realloc(str, 5);
@@ -280,7 +283,6 @@ int main(void)
 
     free(str);
     free(more);
-    */
 
     return 0;
-}
+}*/
