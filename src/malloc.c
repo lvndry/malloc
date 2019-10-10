@@ -61,7 +61,7 @@ static int is_adress_valid(void *ptr)
 static void *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
-    while (ptr != NULL && !(ptr->is_available && ptr->size >= size))
+    while (ptr != NULL && !(ptr->is_available && ptr->size >= size + META_SIZE))
     {
         **last = *ptr;
         ptr = ptr->next;
@@ -113,11 +113,12 @@ static size_t getmappedsize(size_t size)
     size_t n = 1;
     size_t len = PAGE_SIZE;
 
-    if (size > len)
+    while (size >= len)
     {
-        n = (size / len) + 1;
+        size -= len;
+        n++;
     }
-    
+
     return (n * PAGE_SIZE);
 }
 
@@ -135,7 +136,7 @@ static void *alloc(size_t size)
 
     if (first == NULL)
     {
-        size_t map_size = getmappedsize(aligned_size + META_SIZE);
+        size_t map_size = getmappedsize(aligned_size);
         block = getPage(NULL, map_size);
         if (block == NULL)
         {
@@ -149,19 +150,28 @@ static void *alloc(size_t size)
     else
     {
         last = first;
-        block = find_block(first, &last, aligned_size + META_SIZE);
+        block = find_block(first, &last, aligned_size);
         if (block != NULL)
         {
+            size_t remaining = block->size;
             if ((block->size - aligned_size) >= META_SIZE + 4)
             {
-                size_t remaining = block->size;
                 create_block(last, block, aligned_size);
                 split_block(block, remaining);
+            }
+            else
+            {
+                size_t map_size = getmappedsize(aligned_size);
+                block = getPage(last, map_size);
+                if (block == NULL)
+                {
+                    return NULL;
+                }
             }
         }
         else
         {
-            size_t map_size = getmappedsize(aligned_size + META_SIZE);
+            size_t map_size = getmappedsize(aligned_size);
             block = getPage(NULL, map_size);
             if (block == NULL)
             {
@@ -184,7 +194,9 @@ void *calloc(size_t nmemb, size_t size)
 {
     void *call = alloc(nmemb * size);
     if (call == NULL)
+    {
         return NULL;
+    }
     call = memset(call, 0, size);
     return call;
 }
@@ -247,18 +259,14 @@ void free(void *ptr)
 
 int main(void)
 {
-    char *str = (char*)alloc(2000000);
-    if (str == NULL)
+    for (int i = 0; i < 5000; i++)
     {
-        printf("str: Failed to allocate memory..\n");
-    }
-
-    // printf("str: Address returned: %p\n", str);
-
-    char *more = (char*)alloc(500000);
-    if (more == NULL)
-    {
-        printf("more: Failed to allocate memory..\n");
+        int *n = alloc(100);
+        if (n == NULL)
+        {
+            printf("malloc %d failed...\n", i);
+        }
+        printf("malloc %d\n", i);
     }
     /*
     printf("more: Address returned: %p\n", more);
