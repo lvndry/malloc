@@ -18,10 +18,10 @@ static void create_block(struct mem_block *last, struct mem_block *block, size_t
 static void *find_block(struct mem_block *start, struct mem_block **last, size_t size);
 static size_t getmappedsize(size_t size);
 static struct mem_block *getPage(struct mem_block *last, size_t map_size);
-static int is_adress_valid(void *ptr);
+// static int is_adress_valid(void *ptr);
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
 static void split_block(struct mem_block *block, size_t size);
-static void *get_meta(char *ptr);
+// static void *get_meta(char *ptr);
 
 // TO REMOVE BEFORE PUSH TO PROD
 // static void print_block(struct mem_block *block)
@@ -47,7 +47,7 @@ static size_t align(size_t n)
     return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
 }
 
-static void *get_meta(char *ptr)
+/* static void *get_meta(char *ptr)
 {
     return ptr - META_SIZE;
 }
@@ -57,7 +57,7 @@ static int is_adress_valid(void *ptr)
     void *addr = get_meta(ptr);
     struct mem_block *meta = addr;
     return (void*)meta->data == (void*)ptr;
-}
+}*/
 
 static void *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
@@ -74,7 +74,7 @@ static void *find_block(struct mem_block *start, struct mem_block **last, size_t
 static void split_block(struct mem_block *block, size_t free_size)
 {
     struct mem_block *next = (void*)(block->data + block->size);
-    next->size = free_size - block->size - META_SIZE;
+    next->size = free_size - block->size - (2 * META_SIZE);
     next->is_available = 1;
     next->next = block->next;
     block->next = next;
@@ -257,9 +257,9 @@ void free(void *ptr)
 
 int main(void)
 {
-    char *val = malloc(5);
+    /* char *val =*/ malloc(5);
     // free(val);
-    char *other = malloc(120);
+    /* char *other = */malloc(120);
     // free(other);
     return 0;
 }
