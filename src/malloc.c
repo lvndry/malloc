@@ -15,7 +15,7 @@
 static size_t align(size_t n);
 static void *alloc(size_t size);
 static void create_block(struct mem_block *last, struct mem_block *block, size_t size);
-static void *find_block(struct mem_block *start, struct mem_block **last, size_t size);
+static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size);
 static size_t getmappedsize(size_t size);
 static struct mem_block *getPage(struct mem_block *last, size_t map_size);
 // static int is_adress_valid(void *ptr);
@@ -59,7 +59,7 @@ static int is_adress_valid(void *ptr)
     return (void*)meta->data == (void*)ptr;
 }*/
 
-static void *find_block(struct mem_block *start, struct mem_block **last, size_t size)
+static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
     while (ptr && !(ptr->is_available && ptr->size >= size + META_SIZE))
@@ -73,7 +73,7 @@ static void *find_block(struct mem_block *start, struct mem_block **last, size_t
 
 static void split_block(struct mem_block *block, size_t free_size)
 {
-    struct mem_block *next = (void*)(block->data + block->size);
+    struct mem_block *next = (struct mem_block*)(block->data + block->size);
     next->size = free_size - block->size - (2 * META_SIZE);
     next->is_available = 1;
     next->next = block->next;
@@ -131,7 +131,7 @@ static void *alloc(size_t size)
     }
 
     size_t aligned_size = align(size);
-    static void *first = NULL;
+    static struct mem_block *first = NULL;
     struct mem_block *last = NULL;
     struct mem_block *block = NULL;
 
@@ -143,9 +143,11 @@ static void *alloc(size_t size)
         {
             return NULL;
         }
-
         create_block(last, block, aligned_size);
-        split_block(block, PAGE_SIZE);
+        if (map_size >= aligned_size + META_SIZE + 100)
+        {
+            split_block(block, PAGE_SIZE);
+        }
         first = block;
     }
     else
@@ -158,7 +160,7 @@ static void *alloc(size_t size)
             if ((block->size - aligned_size) >= META_SIZE + 4)
             {
                 create_block(last, block, aligned_size);
-                split_block(block, remaining);
+                // split_block(block, remaining);
             }
             else
             {
@@ -170,6 +172,7 @@ static void *alloc(size_t size)
                 }
             }
         }
+        /*
         else
         {
             size_t map_size = getmappedsize(aligned_size);
@@ -178,7 +181,7 @@ static void *alloc(size_t size)
             {
                 return NULL;
             }
-        }
+        }*/
     }
 
     return (void*)block->data;
