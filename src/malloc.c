@@ -14,7 +14,7 @@
 
 static size_t align(size_t n);
 static void *alloc(size_t size);
-static void create_block(struct mem_block *last, struct mem_block *block, size_t size);
+static void create_block(struct mem_block *block, struct mem_block *last, size_t size);
 static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size);
 static size_t getmappedsize(size_t size);
 static struct mem_block *getPage(struct mem_block *last, size_t map_size);
@@ -85,13 +85,13 @@ static void split_block(struct mem_block *block, size_t free_size)
     block->next = next;
 }
 
-static void create_block(struct mem_block *last, struct mem_block *block, size_t size)
+static void create_block(struct mem_block *block, struct mem_block *last, size_t size)
 {
     block->size = size;
     block->is_available = 0;
-    void *tmp = block;
-    char *test = tmp;
-    block->data = test + META_SIZE;
+    void *addr = block;
+    char *tmp = addr;
+    block->data = tmp + META_SIZE;
     block->next = NULL;
 
     if (last != NULL)
@@ -106,12 +106,6 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
     if (mapped_page == MAP_FAILED)
     {
         return NULL;
-    }
-
-    if (last != NULL)
-    {
-        last->next = mapped_page;
-        return last;
     }
 
     return mapped_page;
@@ -145,10 +139,10 @@ static void *alloc(size_t size)
         {
             return NULL;
         }
-        create_block(last, block, aligned_size);
+        create_block(block, last, aligned_size);
         if (map_size >= aligned_size + META_SIZE + 50)
         {
-            split_block(block, PAGE_SIZE);
+            split_block(block, map_size);
         }
         first = block;
     }
@@ -159,18 +153,24 @@ static void *alloc(size_t size)
         if (block != NULL)
         {
             size_t remaining = block->size;
-            if ((block->size - aligned_size) >= META_SIZE + 50)
+            if ((block->size - aligned_size) >= META_SIZE + 100)
             {
-                create_block(last, block, aligned_size);
+                create_block(block, last, aligned_size);
                 split_block(block, remaining);
             }
             else
             {
                 size_t map_size = getmappedsize(aligned_size);
                 block = getPage(last, map_size);
+                create_block(block, last, aligned_size);
+
                 if (block == NULL)
                 {
                     return NULL;
+                }
+                if (map_size >= aligned_size + META_SIZE + 100)
+                {
+                    split_block(block, map_size);
                 }
             }
         }
@@ -181,6 +181,11 @@ static void *alloc(size_t size)
             if (block == NULL)
             {
                 return NULL;
+            }
+            create_block(block, last, aligned_size);
+            if (map_size >= aligned_size + META_SIZE + 100)
+            {
+                split_block(block, map_size);
             }
         }
     }
@@ -258,7 +263,7 @@ void my_free(void *ptr)
     return;
 }
 
-__attribute__((visibility("default")))
+/*__attribute__((visibility("default")))
 void *calloc(size_t nmemb, size_t size)
 {
     return my_calloc(nmemb, size);
@@ -282,13 +287,16 @@ void free(void *ptr)
 {
     my_free(ptr);
 }
+*/
 
-/*
 int main(void)
 {
-    char *ptr = alloc(50);
-    my_realloc(ptr, 2000);
-
+    for (int i = 0; i < 3000000; i++)
+    {
+        // printf("malloc number %d\n", i);
+        char *tmp = alloc(i);
+        my_free(tmp);
+        printf("Stopped after %d iterations\n", i);
+    }
     return 0;
 }
-*/
