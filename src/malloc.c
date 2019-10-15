@@ -114,7 +114,7 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 static size_t getmappedsize(size_t size)
 {
     size_t len = PAGE_SIZE;
-    size_t n = (len / size) + 1;
+    size_t n = (size / len) + 1;
 
     return (n * PAGE_SIZE);
 }
@@ -288,6 +288,7 @@ void free(void *ptr)
     my_free(ptr);
 }
 
+/*
 int main(void)
 {
     for (int i = 0; i < 3000000; i++)
@@ -299,3 +300,4 @@ int main(void)
     }
     return 0;
 }
+*/
