@@ -18,7 +18,7 @@ static void create_block(struct mem_block *last, struct mem_block *block, size_t
 static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size);
 static size_t getmappedsize(size_t size);
 static struct mem_block *getPage(struct mem_block *last, size_t map_size);
-// static int is_adress_valid(void *ptr);
+static int is_adress_valid(void *ptr);
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
 static void split_block(struct mem_block *block, size_t size);
 static struct mem_block *get_meta(void *ptr);
@@ -49,7 +49,10 @@ static size_t align(size_t n)
 
 struct mem_block *get_meta(void *ptr)
 {
-    return ptr - META_SIZE;
+    char *tmp = ptr;
+    ptr = tmp - META_SIZE;
+
+    return ptr;
 }
 
 static int is_adress_valid(void *ptr)
@@ -75,6 +78,9 @@ static void split_block(struct mem_block *block, size_t free_size)
     struct mem_block *next = (struct mem_block*)(block->data + block->size);
     next->size = free_size - block->size - (2 * META_SIZE);
     next->is_available = 1;
+    void *tmp = block;
+    char *test = tmp;
+    next->data = test + META_SIZE;
     next->next = block->next;
     block->next = next;
 }
@@ -83,6 +89,9 @@ static void create_block(struct mem_block *last, struct mem_block *block, size_t
 {
     block->size = size;
     block->is_available = 0;
+    void *tmp = block;
+    char *test = tmp;
+    block->data = test + META_SIZE;
     block->next = NULL;
 
     if (last != NULL)
@@ -130,6 +139,7 @@ static void *alloc(size_t size)
 
     if (first == NULL)
     {
+        printf("first == NULL\n");
         size_t map_size = getmappedsize(aligned_size);
         block = getPage(NULL, map_size);
         if (block == NULL)
@@ -179,11 +189,13 @@ static void *alloc(size_t size)
     return (void*)block->data;
 }
 
+/*
 __attribute__((visibility("default")))
 void *malloc(size_t size)
 {
     return alloc(size);
 }
+*/
 
 /*  __attribute__((visibility("default")))
 void *calloc(size_t nmemb, size_t size)
@@ -240,6 +252,10 @@ void *my_realloc(void *ptr, size_t size)
 
 void my_free(void *ptr)
 {
+    if (ptr == NULL)
+    {
+        return;
+    }
     if (is_adress_valid(ptr))
     {
         struct mem_block *to_free = get_meta(ptr);
@@ -256,17 +272,15 @@ void free(void *ptr)
 
 int main(void)
 {
-    for (size_t i = 0; i < 6000000; i++)
+    for (size_t i = 0; i < 40000; i++)
     {
         char *ptr = alloc(i);
         my_free(ptr);
     }
-    /* char *val =*/ alloc(5000000);
-    // free(val);
-    /* char *other = */alloc(120);
-    // free(other);
+
     return 0;
 }
+
 /* int main(void)
 {
     for (int i = 0; i < 50000; i++)

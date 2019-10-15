@@ -6,7 +6,7 @@
 struct mem_block {
     size_t size;
     int is_available;
-    char data[1];
+    char *data;
     struct mem_block *next;
 };
 
