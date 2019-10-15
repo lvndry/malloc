@@ -263,7 +263,7 @@ void my_free(void *ptr)
     return;
 }
 
-/*__attribute__((visibility("default")))
+__attribute__((visibility("default")))
 void *calloc(size_t nmemb, size_t size)
 {
     return my_calloc(nmemb, size);
@@ -287,7 +287,6 @@ void free(void *ptr)
 {
     my_free(ptr);
 }
-*/
 
 int main(void)
 {
