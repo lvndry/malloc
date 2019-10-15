@@ -189,15 +189,15 @@ static void *alloc(size_t size)
     return (void*)block->data;
 }
 
-/*
+
 __attribute__((visibility("default")))
 void *malloc(size_t size)
 {
     return alloc(size);
 }
-*/
 
-/*  __attribute__((visibility("default")))
+
+ __attribute__((visibility("default")))
 void *calloc(size_t nmemb, size_t size)
 {
     void *call = alloc(nmemb * size);
@@ -209,7 +209,6 @@ void *calloc(size_t nmemb, size_t size)
     return call;
 }
 
-__attribute__((visibility("default")))
 void *my_realloc(void *ptr, size_t size)
 {
     if (ptr == NULL)
@@ -248,7 +247,12 @@ void *my_realloc(void *ptr, size_t size)
 
     return ptr;
 }
-*/
+
+__attribute__((visibility("default")))
+void *realloc(void *ptr)
+{
+    return my_realloc(ptr);
+}
 
 void my_free(void *ptr)
 {
@@ -264,12 +268,13 @@ void my_free(void *ptr)
     return;
 }
 
-/*  __attribute__((visibility("default")))
+__attribute__((visibility("default")))
 void free(void *ptr)
 {
+    my_free(ptr);
 }
-*/
 
+/*
 int main(void)
 {
     for (size_t i = 0; i < 40000; i++)
@@ -280,30 +285,4 @@ int main(void)
 
     return 0;
 }
-
-/* int main(void)
-{
-    for (int i = 0; i < 50000; i++)
-    {
-        int *n = alloc(100);
-        if (n == NULL)
-        {
-            printf("malloc %d failed...\n", i);
-        }
-        printf("malloc %d\n", i);
-    }
-
-    printf("more: Address returned: %p\n", more);
-
-    str = (char*)my_realloc(str, 5);
-    if (str == NULL)
-    {
-        printf("Failed to reallocate memory..\n");
-    }
-    printf("str: Address returned: %p\n", str);
-
-    free(str);
-    free(more);
-
-    return 0;
-}*/
+*/
