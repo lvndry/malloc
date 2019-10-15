@@ -23,17 +23,6 @@ void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
 static void split_block(struct mem_block *block, size_t size);
 static struct mem_block *get_meta(void *ptr);
 
-// TO REMOVE BEFORE PUSH TO PROD
-// static void print_block(struct mem_block *block)
-// {
-//     printf("Block address: %p\n", (void*)block);
-//     printf("Block size: %ld\n", block->size);
-//     printf("Block availability: %d\n", block->is_available);
-//     printf("Block data: %p\n", block->data);
-//     printf("Block next: %p\n", (void*)block->next);
-//     printf("\n");
-// }
-
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size)
 {
     struct mem_block *src = block->next;
@@ -78,9 +67,9 @@ static void split_block(struct mem_block *block, size_t free_size)
     struct mem_block *next = (struct mem_block*)(block->data + block->size);
     next->size = free_size - block->size - (2 * META_SIZE);
     next->is_available = 1;
-    void *tmp = block;
-    char *test = tmp;
-    next->data = test + META_SIZE;
+    void *addr = block;
+    char *tmp = addr;
+    next->data = tmp + META_SIZE;
     next->next = block->next;
     block->next = next;
 }
@@ -219,13 +208,19 @@ void *my_realloc(void *ptr, size_t size)
     {
         if (addr->size + addr->next->size + META_SIZE >= size)
         {
-            addr->size = size;
+            addr->size = addr->size + addr->next->size + META_SIZE;
             addr->next = addr->next->next;
         }
-        else
+        if (addr->size >= aligned_size + META_SIZE + 100)
         {
-            size_t map_size = getmappedsize(size);
-            struct mem_block *n = getPage(addr, map_size);
+            struct mem_block *next = (struct mem_block*)(addr->data + aligned_size);
+            next->size = addr->size - aligned_size - (2 * META_SIZE);
+            next->is_available = 1;
+            void *vb = addr;
+            char *tmp = vb;
+            next->data = tmp + META_SIZE;
+            next->next = addr->next;
+            addr->next = next;
         }
     }
     else
@@ -255,11 +250,13 @@ void my_free(void *ptr)
     {
         return;
     }
+
     if (is_adress_valid(ptr))
     {
         struct mem_block *to_free = get_meta(ptr);
         to_free->is_available = 1;
     }
+
     return;
 }
 
@@ -281,22 +278,25 @@ void *realloc(void *ptr, size_t size)
     return my_realloc(ptr, size);
 }
 
-
 __attribute__((visibility("default")))
 void free(void *ptr)
 {
     my_free(ptr);
 }
 
-/*
-int main(void)
+/* int main(void)
 {
     for (int i = 0; i < 3000000; i++)
     {
         // printf("malloc number %d\n", i);
         char *tmp = alloc(i);
+        if (tmp == NULL)
+        {
+            continue;
+        }
+        tmp[0] = 'c';
         my_free(tmp);
-        printf("Stopped after %d iterations\n", i);
+        // printf("Stopped after %d iterations\n", i);
     }
     return 0;
 }
