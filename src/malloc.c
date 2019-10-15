@@ -139,7 +139,6 @@ static void *alloc(size_t size)
 
     if (first == NULL)
     {
-        printf("first == NULL\n");
         size_t map_size = getmappedsize(aligned_size);
         block = getPage(NULL, map_size);
         if (block == NULL)
@@ -178,7 +177,7 @@ static void *alloc(size_t size)
         else
         {
             size_t map_size = getmappedsize(aligned_size);
-            block = getPage(NULL, map_size);
+            block = getPage(last, map_size);
             if (block == NULL)
             {
                 return NULL;
@@ -187,26 +186,6 @@ static void *alloc(size_t size)
     }
 
     return (void*)block->data;
-}
-
-
-__attribute__((visibility("default")))
-void *malloc(size_t size)
-{
-    return alloc(size);
-}
-
-
- __attribute__((visibility("default")))
-void *calloc(size_t nmemb, size_t size)
-{
-    void *call = alloc(nmemb * size);
-    if (call == NULL)
-    {
-        return NULL;
-    }
-    call = memset(call, 0, size);
-    return call;
 }
 
 void *my_realloc(void *ptr, size_t size)
@@ -222,37 +201,48 @@ void *my_realloc(void *ptr, size_t size)
         return ptr;
     }
 
-    void *addr = get_meta(ptr);
-    struct mem_block *meta = addr;
-    size_t aligned_size = align(size);
-    struct mem_block *last = meta;
-    struct mem_block *next_free = find_block(meta, &last, aligned_size);
-    if (next_free != NULL)
+    struct mem_block *addr = get_meta(ptr);
+
+    if (addr->size >= size)
     {
-        if (meta->next == next_free)
+        return ptr;
+    }
+
+    size_t aligned_size = align(size);
+
+    if (addr->next != NULL && addr->next->is_available)
+    {
+        if (addr->size + addr->next->size + META_SIZE >= size)
         {
-            meta->size += aligned_size;
-            next_free += aligned_size;
+            addr->size = size;
+            addr->next = addr->next->next;
         }
         else
         {
-            move_data(meta, next_free, aligned_size);
+            size_t map_size = getmappedsize(size);
+            struct mem_block *n = getPage(addr, map_size);
         }
     }
     else
     {
-        struct mem_block *dest = getPage(NULL, aligned_size);
-        move_data(meta, dest, aligned_size);
+        void *dest = malloc(aligned_size);
+        move_data(addr, dest, aligned_size);
     }
 
     return ptr;
 }
 
-__attribute__((visibility("default")))
-void *realloc(void *ptr)
+void *my_calloc(size_t nmemb, size_t size)
 {
-    return my_realloc(ptr);
+    void *call = alloc(nmemb * size);
+    if (call == NULL)
+    {
+        return NULL;
+    }
+    call = memset(call, 0, size);
+    return call;
 }
+
 
 void my_free(void *ptr)
 {
@@ -269,6 +259,25 @@ void my_free(void *ptr)
 }
 
 __attribute__((visibility("default")))
+void *calloc(size_t nmemb, size_t size)
+{
+    return my_calloc(nmemb, size);
+}
+
+__attribute__((visibility("default")))
+void *malloc(size_t size)
+{
+    return alloc(size);
+}
+
+__attribute__((visibility("default")))
+void *realloc(void *ptr, size_t size)
+{
+    return my_realloc(ptr, size);
+}
+
+
+__attribute__((visibility("default")))
 void free(void *ptr)
 {
     my_free(ptr);
@@ -277,11 +286,8 @@ void free(void *ptr)
 /*
 int main(void)
 {
-    for (size_t i = 0; i < 40000; i++)
-    {
-        char *ptr = alloc(i);
-        my_free(ptr);
-    }
+    char *ptr = alloc(50);
+    my_realloc(ptr, 2000);
 
     return 0;
 }
