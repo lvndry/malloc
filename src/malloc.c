@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -53,11 +52,7 @@ static int is_adress_valid(void *ptr)
 static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
-    while (
-            ptr != NULL
-            && ptr->is_available == 0
-            && ptr->size < size + (2 * META_SIZE)
-        )
+    while (ptr && ptr->is_available == 0 && ptr->size < size + (2 * META_SIZE))
     {
         **last = *ptr;
         ptr = ptr->next;
@@ -68,11 +63,13 @@ static struct mem_block *find_block(struct mem_block *start, struct mem_block **
 
 static void split_block(struct mem_block *block, size_t free_size)
 {
-    struct mem_block *next = (struct mem_block*)(block->data + block->size);
-    next->size = free_size - block->size - (2 * META_SIZE);
-    next->is_available = 1;
-    void *addr = block;
+    void *addr = block->data;
     char *tmp = addr;
+    struct mem_block *next = (struct mem_block*)(tmp + block->size);
+    next->size = align(free_size - block->size - (2 * META_SIZE));
+    next->is_available = 1;
+    addr = block;
+    tmp = addr;
     next->data = tmp + META_SIZE;
     next->next = block->next;
     block->next = next;
@@ -147,7 +144,7 @@ static void *alloc(size_t size)
         if (block != NULL)
         {
             size_t remaining = block->size;
-            if ((block->size - aligned_size) >= block->size + 2 * META_SIZE)
+            if ((block->size - aligned_size) >= aligned_size + 2 * META_SIZE)
             {
                 create_block(block, last, aligned_size);
                 split_block(block, remaining);
