@@ -277,6 +277,7 @@ __attribute__((visibility("default")))
 void free(void *ptr)
 {
     my_free(ptr);
+    return;
 }
 
 /*
