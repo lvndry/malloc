@@ -205,7 +205,7 @@ void *my_realloc(void *ptr, size_t size)
             addr->size = addr->size + addr->next->size + META_SIZE;
             addr->next = addr->next->next;
         }
-        else
+        if (addr->size >= aligned_size + META_SIZE + 100)
         {
             struct mem_block *next = (struct mem_block*)(addr->data + aligned_size);
             next->size = addr->size - aligned_size - (2 * META_SIZE);
@@ -250,6 +250,7 @@ void my_free(void *ptr)
         struct mem_block *to_free = get_meta(ptr);
         to_free->is_available = 1;
     }
+
     return;
 }
 
@@ -271,22 +272,26 @@ void *realloc(void *ptr, size_t size)
     return my_realloc(ptr, size);
 }
 
-
 __attribute__((visibility("default")))
 void free(void *ptr)
 {
     my_free(ptr);
 }
 
-/* 
+/*
 int main(void)
 {
     for (int i = 0; i < 3000000; i++)
     {
         // printf("malloc number %d\n", i);
         char *tmp = alloc(i);
+        if (tmp == NULL)
+        {
+            continue;
+        }
+        tmp[0] = 'c';
         my_free(tmp);
-        printf("Stopped after %d iterations\n", i);
+        // printf("Stopped after %d iterations\n", i);
     }
     return 0;
 }
