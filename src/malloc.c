@@ -52,7 +52,7 @@ static int is_adress_valid(void *ptr)
 static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
-    while (ptr && ptr->is_available == 0 && ptr->size < size + (2 * META_SIZE))
+    while (ptr && !(ptr->is_available && ptr->size >= size + (2 * META_SIZE)))
     {
         **last = *ptr;
         ptr = ptr->next;
@@ -66,6 +66,7 @@ static void split_block(struct mem_block *block, size_t free_size)
     void *addr = block->data;
     char *tmp = addr;
     struct mem_block *next = (struct mem_block*)(tmp + block->size);
+
     next->size = align(free_size - block->size - (2 * META_SIZE));
     next->is_available = 1;
     addr = block;
@@ -83,11 +84,14 @@ static void create_block(struct mem_block *block, struct mem_block *last, size_t
     char *tmp = addr;
     block->data = tmp + META_SIZE;
     block->next = NULL;
+    last = last;
 
+    /*
     if (last != NULL)
     {
         last->next = block;
     }
+    */
 }
 
 static struct mem_block *getPage(size_t map_size)
@@ -129,9 +133,9 @@ static void *alloc(size_t size)
         {
             return NULL;
         }
-        create_block(block, last, aligned_size);
-        if (map_size >= aligned_size + META_SIZE + 50)
+        if (map_size >= aligned_size + META_SIZE + 100)
         {
+            create_block(block, last, aligned_size);
             split_block(block, map_size);
         }
 
@@ -144,7 +148,7 @@ static void *alloc(size_t size)
         if (block != NULL)
         {
             size_t remaining = block->size;
-            if ((block->size - aligned_size) >= aligned_size + 2 * META_SIZE)
+            if (block->size >= aligned_size + (2 * META_SIZE) + 100)
             {
                 create_block(block, last, aligned_size);
                 split_block(block, remaining);
@@ -165,9 +169,9 @@ static void *alloc(size_t size)
             {
                 return NULL;
             }
-            create_block(block, last, aligned_size);
-            if (map_size >= aligned_size + META_SIZE + 100)
+            if (map_size >= aligned_size + (2 * +META_SIZE) + 100)
             {
+                create_block(block, last, aligned_size);
                 split_block(block, map_size);
             }
         }
@@ -190,14 +194,12 @@ void *my_realloc(void *ptr, size_t size)
     }
 
     struct mem_block *addr = get_meta(ptr);
-
     if (addr->size >= size)
     {
         return ptr;
     }
 
     size_t aligned_size = align(size);
-
     if (addr->next != NULL && addr->next->is_available)
     {
         if (addr->size + addr->next->size + META_SIZE >= size)
@@ -233,7 +235,7 @@ void *my_calloc(size_t nmemb, size_t size)
     {
         return NULL;
     }
-    call = memset(call, 0, size);
+    call = memset(call, 0, align(size));
     return call;
 }
 
