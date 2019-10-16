@@ -23,17 +23,6 @@ void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
 static void split_block(struct mem_block *block, size_t size);
 static struct mem_block *get_meta(void *ptr);
 
-// TO REMOVE BEFORE PUSH TO PROD
-// static void print_block(struct mem_block *block)
-// {
-//     printf("Block address: %p\n", (void*)block);
-//     printf("Block size: %ld\n", block->size);
-//     printf("Block availability: %d\n", block->is_available);
-//     printf("Block data: %p\n", block->data);
-//     printf("Block next: %p\n", (void*)block->next);
-//     printf("\n");
-// }
-
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size)
 {
     struct mem_block *src = block->next;
@@ -64,7 +53,11 @@ static int is_adress_valid(void *ptr)
 static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
-    while (ptr && !(ptr->is_available && ptr->size >= size + META_SIZE))
+    while (
+            ptr != NULL
+            && ptr->is_available == 0
+            && ptr->size < size + (2 * META_SIZE)
+        )
     {
         **last = *ptr;
         ptr = ptr->next;
@@ -78,9 +71,9 @@ static void split_block(struct mem_block *block, size_t free_size)
     struct mem_block *next = (struct mem_block*)(block->data + block->size);
     next->size = free_size - block->size - (2 * META_SIZE);
     next->is_available = 1;
-    void *tmp = block;
-    char *test = tmp;
-    next->data = test + META_SIZE;
+    void *addr = block;
+    char *tmp = addr;
+    next->data = tmp + META_SIZE;
     next->next = block->next;
     block->next = next;
 }
@@ -154,7 +147,7 @@ static void *alloc(size_t size)
         if (block != NULL)
         {
             size_t remaining = block->size;
-            if ((block->size - aligned_size) >= META_SIZE + 100)
+            if ((block->size - aligned_size) >= block->size + 2 * META_SIZE)
             {
                 create_block(block, last, aligned_size);
                 split_block(block, remaining);
@@ -164,15 +157,7 @@ static void *alloc(size_t size)
                 size_t map_size = getmappedsize(aligned_size);
                 block = getPage(map_size);
                 create_block(block, last, aligned_size);
-
-                if (block == NULL)
-                {
-                    return NULL;
-                }
-                if (map_size >= aligned_size + META_SIZE + 100)
-                {
-                    split_block(block, remaining + map_size);
-                }
+                split_block(block, remaining + map_size);
             }
         }
         else
@@ -220,14 +205,19 @@ void *my_realloc(void *ptr, size_t size)
     {
         if (addr->size + addr->next->size + META_SIZE >= size)
         {
-            addr->size = size;
+            addr->size = addr->size + addr->next->size + META_SIZE;
             addr->next = addr->next->next;
         }
         else
         {
-            size_t map_size = getmappedsize(size);
-            struct mem_block *n = getPage(map_size);
-            n = n;
+            struct mem_block *next = (struct mem_block*)(addr->data + aligned_size);
+            next->size = addr->size - aligned_size - (2 * META_SIZE);
+            next->is_available = 1;
+            void *vb = addr;
+            char *tmp = vb;
+            next->data = tmp + META_SIZE;
+            next->next = addr->next;
+            addr->next = next;
         }
     }
     else
@@ -257,6 +247,7 @@ void my_free(void *ptr)
     {
         return;
     }
+
     if (is_adress_valid(ptr))
     {
         struct mem_block *to_free = get_meta(ptr);
@@ -290,6 +281,7 @@ void free(void *ptr)
     my_free(ptr);
 }
 
+/* 
 int main(void)
 {
     for (int i = 0; i < 3000000; i++)
@@ -301,3 +293,4 @@ int main(void)
     }
     return 0;
 }
+*/
