@@ -168,7 +168,7 @@ static void *alloc(size_t size)
             {
                 return NULL;
             }
-            if (map_size >= aligned_size + (2 * +META_SIZE) + 100)
+            if (map_size >= aligned_size + (2 * META_SIZE) + 100)
             {
                 create_block(block, aligned_size);
                 split_block(block, map_size);
