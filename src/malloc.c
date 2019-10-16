@@ -13,10 +13,10 @@
 
 static size_t align(size_t n);
 static void *alloc(size_t size);
-static void create_block(struct mem_block *block, struct mem_block *last, size_t size);
+static void create_block(struct mem_block *block, size_t size);
 static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size);
 static size_t getmappedsize(size_t size);
-static struct mem_block *getPage(size_t map_size);
+static struct mem_block *getPage(struct mem_block* last, size_t map_size);
 static int is_adress_valid(void *ptr);
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
 static void split_block(struct mem_block *block, size_t size);
@@ -54,7 +54,7 @@ static struct mem_block *find_block(struct mem_block *start, struct mem_block **
     struct mem_block *ptr = start;
     while (ptr && !(ptr->is_available && ptr->size >= size + (2 * META_SIZE)))
     {
-        **last = *ptr;
+        *last = ptr;
         ptr = ptr->next;
     }
 
@@ -76,7 +76,7 @@ static void split_block(struct mem_block *block, size_t free_size)
     block->next = next;
 }
 
-static void create_block(struct mem_block *block, struct mem_block *last, size_t size)
+static void create_block(struct mem_block *block, size_t size)
 {
     block->size = size;
     block->is_available = 0;
@@ -84,22 +84,21 @@ static void create_block(struct mem_block *block, struct mem_block *last, size_t
     char *tmp = addr;
     block->data = tmp + META_SIZE;
     block->next = NULL;
-    last = last;
-
-    /*
-    if (last != NULL)
-    {
-        last->next = block;
-    }
-    */
 }
 
-static struct mem_block *getPage(size_t map_size)
+static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 {
-    struct mem_block *mapped_page = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if (mapped_page == MAP_FAILED)
+    void *map_res = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (map_res == MAP_FAILED)
     {
         return NULL;
+    }
+
+    struct mem_block *mapped_page = map_res;
+
+    if (last != NULL)
+    {
+        last->next = map_res;
     }
 
     return mapped_page;
@@ -128,14 +127,14 @@ static void *alloc(size_t size)
     if (first == NULL)
     {
         size_t map_size = getmappedsize(aligned_size);
-        block = getPage(map_size);
+        block = getPage(last, map_size);
         if (block == NULL)
         {
             return NULL;
         }
         if (map_size >= aligned_size + META_SIZE + 100)
         {
-            create_block(block, last, aligned_size);
+            create_block(block, aligned_size);
             split_block(block, map_size);
         }
 
@@ -150,28 +149,28 @@ static void *alloc(size_t size)
             size_t remaining = block->size;
             if (block->size >= aligned_size + (2 * META_SIZE) + 100)
             {
-                create_block(block, last, aligned_size);
+                create_block(block, aligned_size);
                 split_block(block, remaining);
             }
             else
             {
                 size_t map_size = getmappedsize(aligned_size);
-                block = getPage(map_size);
-                create_block(block, last, aligned_size);
+                block = getPage(last, map_size);
+                create_block(block, aligned_size);
                 split_block(block, remaining + map_size);
             }
         }
         else
         {
             size_t map_size = getmappedsize(aligned_size);
-            block = getPage(map_size);
+            block = getPage(last, map_size);
             if (block == NULL)
             {
                 return NULL;
             }
             if (map_size >= aligned_size + (2 * +META_SIZE) + 100)
             {
-                create_block(block, last, aligned_size);
+                create_block(block, aligned_size);
                 split_block(block, map_size);
             }
         }
