@@ -47,7 +47,7 @@ static struct mem_block *find_block(
     )
 {
     struct mem_block *ptr = start;
-    while (ptr && !(ptr->is_available && ptr->size > size))
+    while (ptr && !(ptr->is_available && ptr->size >= size))
     {
         *last = ptr;
         ptr = ptr->next;
@@ -62,7 +62,7 @@ static void split_block(struct mem_block *block, size_t free_size)
 
     next->size = align(free_size - block->size - (2 * META_SIZE));
     next->is_available = 1;
-    void *addr = block;
+    void *addr = next;
     char *tmp = addr;
     next->data = tmp + META_SIZE;
     next->next = block->next;
@@ -76,12 +76,20 @@ static void create_block(struct mem_block *block, size_t size)
     void *addr = block;
     char *tmp = addr;
     block->data = tmp + META_SIZE;
+    // TODO verify this. Sometimes should not be to NULL
     block->next = NULL;
 }
 
 static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 {
-    void *map_res = mmap(NULL, map_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void *map_res = mmap(
+            NULL,
+            map_size,
+            PROT_READ | PROT_WRITE,
+            MAP_PRIVATE | MAP_ANONYMOUS,
+            -1,
+            0);
+
     if (map_res == MAP_FAILED)
     {
         return NULL;
@@ -100,7 +108,7 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 static size_t getmappedsize(size_t size)
 {
     size_t len = PAGE_SIZE;
-    size_t n = ((size + 2 * META_SIZE) / len) + 1;
+    size_t n = ((size  + META_SIZE) / len) + 1;
 
     return (n * PAGE_SIZE);
 }
@@ -143,16 +151,9 @@ static void *alloc(size_t size)
         {
             size_t remaining = block->size;
             create_block(block, aligned_size);
-            if (block->size >= aligned_size + (2 * META_SIZE))
+            if (block->size >= aligned_size + (2 * META_SIZE) + 80)
             {
                 split_block(block, remaining);
-            }
-            else
-            {
-                size_t map_size = getmappedsize(aligned_size);
-                block = getPage(last, map_size);
-                create_block(block, aligned_size);
-                split_block(block, remaining + map_size);
             }
         }
         else
