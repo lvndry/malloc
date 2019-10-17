@@ -52,7 +52,7 @@ static int is_adress_valid(void *ptr)
 static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size)
 {
     struct mem_block *ptr = start;
-    while (ptr && !(ptr->is_available && ptr->size >= size + (2 * META_SIZE)))
+    while (ptr && !(ptr->is_available && ptr->size > size))
     {
         *last = ptr;
         ptr = ptr->next;
@@ -107,7 +107,7 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 static size_t getmappedsize(size_t size)
 {
     size_t len = PAGE_SIZE;
-    size_t n = (size / len) + 1;
+    size_t n = ((size + META_SIZE) / len) + 1;
 
     return (n * PAGE_SIZE);
 }
@@ -242,11 +242,9 @@ void *my_calloc(size_t nmemb, size_t size)
     {
         return NULL;
     }
-    // call = memset(call, 0, nmemb * size);
-    for (size_t i = 0; i < size; i++)
-    {
-        call[i] = 0;
-    }
+
+    call = memset(call, 0, align(nmemb * size));
+
     return call;
 }
 
