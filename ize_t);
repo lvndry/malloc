@@ -1,0 +1,91 @@
+[1mdiff --git a/libmalloc.so b/libmalloc.so[m
+[1mindex a29a42b..34bed10 100755[m
+Binary files a/libmalloc.so and b/libmalloc.so differ
+[1mdiff --git a/src/malloc.c b/src/malloc.c[m
+[1mindex 70ca13b..3c22764 100644[m
+[1m--- a/src/malloc.c[m
+[1m+++ b/src/malloc.c[m
+[36m@@ -11,16 +11,7 @@[m
+ #define META_SIZE sizeof(struct mem_block)[m
+ #define PAGE_SIZE sysconf(_SC_PAGESIZE)[m
+ [m
+[31m-static size_t align(size_t n);[m
+[31m-static void *alloc(size_t size);[m
+[31m-static void create_block(struct mem_block *block, size_t size);[m
+[31m-static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size);[m
+[31m-static size_t getmappedsize(size_t size);[m
+[31m-static struct mem_block *getPage(struct mem_block* last, size_t map_size);[m
+[31m-static int is_adress_valid(void *ptr);[m
+[31m-void move_data(struct mem_block *block, struct mem_block *dest, size_t size);[m
+[31m-static void split_block(struct mem_block *block, size_t size);[m
+[31m-static struct mem_block *get_meta(void *ptr);[m
+[32m+[m[32mstatic pthread_mutex_t foo_mutex = PTHREAD_MUTEX_INITIALIZER;[m
+ [m
+ void move_data(struct mem_block *block, struct mem_block *dest, size_t size)[m
+ {[m
+[36m@@ -49,7 +40,11 @@[m [mstatic int is_adress_valid(void *ptr)[m
+     return (void*)meta->data == ptr;[m
+ }[m
+ [m
+[31m-static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size)[m
+[32m+[m[32mstatic struct mem_block *find_block([m
+[32m+[m[32m        struct mem_block *start,[m
+[32m+[m[32m        struct mem_block **last,[m
+[32m+[m[32m        size_t size[m
+[32m+[m[32m    )[m
+ {[m
+     struct mem_block *ptr = start;[m
+     while (ptr && !(ptr->is_available && ptr->size > size))[m
+[36m@@ -67,7 +62,7 @@[m [mstatic void split_block(struct mem_block *block, size_t free_size)[m
+     char *tmp = addr;[m
+     struct mem_block *next = (struct mem_block*)(tmp + block->size);[m
+ [m
+[31m-    next->size = align(free_size - block->size - (2 * META_SIZE));[m
+[32m+[m[32m    next->size = free_size - block->size - META_SIZE;[m
+     next->is_available = 1;[m
+     addr = block;[m
+     tmp = addr;[m
+[36m@@ -114,6 +109,8 @@[m [mstatic size_t getmappedsize(size_t size)[m
+ [m
+ static void *alloc(size_t size)[m
+ {[m
+[32m+[m
+[32m+[m[32m    pthread_mutex_lock(&foo_mutex);[m
+     if (size == 0)[m
+     {[m
+         return NULL;[m
+[36m@@ -176,6 +173,7 @@[m [mstatic void *alloc(size_t size)[m
+         }[m
+     }[m
+ [m
+[32m+[m[32m    pthread_mutex_unlock(&foo_mutex);[m
+     return (void*)block->data;[m
+ }[m
+ [m
+[1mdiff --git a/src/malloc.h b/src/malloc.h[m
+[1mindex 211d833..4e605b6 100644[m
+[1m--- a/src/malloc.h[m
+[1m+++ b/src/malloc.h[m
+[36m@@ -10,7 +10,21 @@[m [mstruct mem_block {[m
+     struct mem_block *next;[m
+ };[m
+ [m
+[31m-void *malloc(size_t);[m
+[32m+[m[32mstatic size_t align(size_t n);[m
+[32m+[m[32mstatic void *alloc(size_t size);[m
+[32m+[m[32mstatic void create_block(struct mem_block *block, size_t size);[m
+[32m+[m[32mstatic struct mem_block *find_block([m
+[32m+[m[32m        struct mem_block *start,[m
+[32m+[m[32m        struct mem_block **last, size_t size[m
+[32m+[m[32m);[m
+[32m+[m
+[32m+[m[32mstatic size_t getmappedsize(size_t size);[m
+[32m+[m[32mstatic struct mem_block *getPage(struct mem_block* last, size_t map_size);[m
+[32m+[m[32mstatic int is_adress_valid(void *ptr);[m
+[32m+[m[32mvoid move_data(struct mem_block *block, struct mem_block *dest, size_t size);[m
+[32m+[m[32mstatic void split_block(struct mem_block *block, size_t size);[m
+[32m+[m[32mstatic struct mem_block *get_meta(void *ptr);-void *malloc(size_t);[m
+[32m+[m
+ void free(void*);[m
+ void *realloc(void*, size_t);[m
+ void *calloc(size_t, size_t);[m

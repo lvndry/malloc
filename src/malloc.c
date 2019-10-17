@@ -11,16 +11,7 @@
 #define META_SIZE sizeof(struct mem_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
-static size_t align(size_t n);
-static void *alloc(size_t size);
-static void create_block(struct mem_block *block, size_t size);
-static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size);
-static size_t getmappedsize(size_t size);
-static struct mem_block *getPage(struct mem_block* last, size_t map_size);
-static int is_adress_valid(void *ptr);
-void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
-static void split_block(struct mem_block *block, size_t size);
-static struct mem_block *get_meta(void *ptr);
+static pthread_mutex_t foo_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size)
 {
@@ -49,7 +40,11 @@ static int is_adress_valid(void *ptr)
     return (void*)meta->data == ptr;
 }
 
-static struct mem_block *find_block(struct mem_block *start, struct mem_block **last, size_t size)
+static struct mem_block *find_block(
+        struct mem_block *start,
+        struct mem_block **last,
+        size_t size
+    )
 {
     struct mem_block *ptr = start;
     while (ptr && !(ptr->is_available && ptr->size > size))
@@ -63,14 +58,12 @@ static struct mem_block *find_block(struct mem_block *start, struct mem_block **
 
 static void split_block(struct mem_block *block, size_t free_size)
 {
-    void *addr = block->data;
-    char *tmp = addr;
-    struct mem_block *next = (struct mem_block*)(tmp + block->size);
+    struct mem_block *next = (struct mem_block*)(block->data + block->size);
 
     next->size = align(free_size - block->size - (2 * META_SIZE));
     next->is_available = 1;
-    addr = block;
-    tmp = addr;
+    void *addr = block;
+    char *tmp = addr;
     next->data = tmp + META_SIZE;
     next->next = block->next;
     block->next = next;
@@ -107,13 +100,15 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 static size_t getmappedsize(size_t size)
 {
     size_t len = PAGE_SIZE;
-    size_t n = ((size + META_SIZE) / len) + 1;
+    size_t n = ((size + 2 * META_SIZE) / len) + 1;
 
     return (n * PAGE_SIZE);
 }
 
 static void *alloc(size_t size)
 {
+
+    pthread_mutex_lock(&foo_mutex);
     if (size == 0)
     {
         return NULL;
@@ -132,9 +127,9 @@ static void *alloc(size_t size)
         {
             return NULL;
         }
-        if (map_size >= aligned_size + META_SIZE + 100)
+        create_block(block, aligned_size);
+        if (map_size >= aligned_size + (2 * META_SIZE) + 80)
         {
-            create_block(block, aligned_size);
             split_block(block, map_size);
         }
 
@@ -147,9 +142,9 @@ static void *alloc(size_t size)
         if (block != NULL)
         {
             size_t remaining = block->size;
-            if (block->size >= aligned_size + (2 * META_SIZE) + 100)
+            create_block(block, aligned_size);
+            if (block->size >= aligned_size + (2 * META_SIZE))
             {
-                create_block(block, aligned_size);
                 split_block(block, remaining);
             }
             else
@@ -168,14 +163,15 @@ static void *alloc(size_t size)
             {
                 return NULL;
             }
-            if (map_size >= aligned_size + (2 * META_SIZE) + 100)
+            create_block(block, aligned_size);
+            if (map_size >= aligned_size + (2 * META_SIZE))
             {
-                create_block(block, aligned_size);
                 split_block(block, map_size);
             }
         }
     }
 
+    pthread_mutex_unlock(&foo_mutex);
     return (void*)block->data;
 }
 
@@ -188,7 +184,7 @@ void *my_realloc(void *ptr, size_t size)
 
     if (size == 0)
     {
-        free(ptr);
+        my_free(ptr);
         return ptr;
     }
 
@@ -199,14 +195,15 @@ void *my_realloc(void *ptr, size_t size)
     }
 
     size_t aligned_size = align(size);
-    /*
+
+    /* 
     if (addr->next != NULL && addr->next->is_available)
     {
-        if (addr->size + addr->next->size + META_SIZE >= size)
+        if (addr->size + addr->next->size + META_SIZE > size)
         {
             addr->size = addr->size + addr->next->size + META_SIZE;
             addr->next = addr->next->next;
-            if (addr->size >= aligned_size + 2 * META_SIZE + 100)
+            if (addr->size >= aligned_size + META_SIZE + 50)
             {
               void *data = addr->data;
               char *tmp = data;
@@ -220,18 +217,26 @@ void *my_realloc(void *ptr, size_t size)
               addr->next = next;
             }
         }
+        else
+        {
+            void *tmp = ptr;
+            ptr = alloc(size);
+            memcpy(ptr, tmp, aligned_size);
+            free(tmp);
+        }
     }
     else
     {
-        void *dest = malloc(aligned_size);
+        return ptr;
+        void *dest = alloc(aligned_size);
         move_data(addr, dest, aligned_size);
-    }
-    */
+    }*/
 
     void *tmp = ptr;
     ptr = alloc(size);
     memcpy(ptr, tmp, aligned_size);
     free(tmp);
+
     return ptr;
 }
 
