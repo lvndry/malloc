@@ -7,7 +7,7 @@ VPATH = src
 TARGET_LIB = libmalloc.so
 OBJS = malloc.o
 CALL_LIB = libtracemalloc.so
-CALL_OBJS = test/call_trace.o
+CALL_OBJS = call_trace.o
 
 all: $(TARGET_LIB)
 

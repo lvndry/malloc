@@ -229,7 +229,7 @@ void *my_realloc(void *ptr, size_t size)
     */
 
     void *tmp = ptr;
-    ptr = malloc(aligned_size);
+    ptr = alloc(size);
     memcpy(ptr, tmp, aligned_size);
     free(tmp);
     return ptr;
@@ -237,12 +237,16 @@ void *my_realloc(void *ptr, size_t size)
 
 void *my_calloc(size_t nmemb, size_t size)
 {
-    void *call = alloc(nmemb * size);
+    char *call = alloc(nmemb * size);
     if (call == NULL)
     {
         return NULL;
     }
-    call = memset(call, 0, align(size));
+    // call = memset(call, 0, nmemb * size);
+    for (size_t i = 0; i < size; i++)
+    {
+        call[i] = 0;
+    }
     return call;
 }
 
