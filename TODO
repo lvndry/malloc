@@ -8,3 +8,4 @@
 - Realloc should be able to shift left or right depending on where there's free memory
 - Investigate why free_size has such a weird value
 - In free function better check if pointer is valid or not
+- Optimize realloc

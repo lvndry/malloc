@@ -108,7 +108,7 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 static size_t getmappedsize(size_t size)
 {
     size_t len = PAGE_SIZE;
-    size_t n = ((size  + META_SIZE) / len) + 1;
+    size_t n = ((size + META_SIZE) / len) + 1;
 
     return (n * PAGE_SIZE);
 }
@@ -196,42 +196,6 @@ void *my_realloc(void *ptr, size_t size)
     }
 
     size_t aligned_size = align(size);
-
-    /* 
-    if (addr->next != NULL && addr->next->is_available)
-    {
-        if (addr->size + addr->next->size + META_SIZE > size)
-        {
-            addr->size = addr->size + addr->next->size + META_SIZE;
-            addr->next = addr->next->next;
-            if (addr->size >= aligned_size + META_SIZE + 50)
-            {
-              void *data = addr->data;
-              char *tmp = data;
-              struct mem_block *next = (struct mem_block*)(tmp + addr->size);
-              next->size = addr->size - aligned_size - (2 * META_SIZE);
-              next->is_available = 1;
-              void *vb = addr;
-              tmp = vb;
-              next->data = tmp + META_SIZE;
-              next->next = addr->next;
-              addr->next = next;
-            }
-        }
-        else
-        {
-            void *tmp = ptr;
-            ptr = alloc(size);
-            memcpy(ptr, tmp, aligned_size);
-            free(tmp);
-        }
-    }
-    else
-    {
-        return ptr;
-        void *dest = alloc(aligned_size);
-        move_data(addr, dest, aligned_size);
-    }*/
 
     void *tmp = ptr;
     ptr = alloc(size);
