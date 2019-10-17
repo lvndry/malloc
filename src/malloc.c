@@ -199,6 +199,7 @@ void *my_realloc(void *ptr, size_t size)
     }
 
     size_t aligned_size = align(size);
+    /*
     if (addr->next != NULL && addr->next->is_available)
     {
         if (addr->size + addr->next->size + META_SIZE >= size)
@@ -225,7 +226,12 @@ void *my_realloc(void *ptr, size_t size)
         void *dest = malloc(aligned_size);
         move_data(addr, dest, aligned_size);
     }
+    */
 
+    void *tmp = ptr;
+    ptr = malloc(aligned_size);
+    memcpy(ptr, tmp, aligned_size);
+    free(tmp);
     return ptr;
 }
 
