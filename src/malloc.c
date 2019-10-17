@@ -205,17 +205,19 @@ void *my_realloc(void *ptr, size_t size)
         {
             addr->size = addr->size + addr->next->size + META_SIZE;
             addr->next = addr->next->next;
-        }
-        if (addr->size >= aligned_size + META_SIZE + 100)
-        {
-            struct mem_block *next = (struct mem_block*)(addr->data + aligned_size);
-            next->size = addr->size - aligned_size - (2 * META_SIZE);
-            next->is_available = 1;
-            void *vb = addr;
-            char *tmp = vb;
-            next->data = tmp + META_SIZE;
-            next->next = addr->next;
-            addr->next = next;
+            if (addr->size >= aligned_size + 2 * META_SIZE + 100)
+            {
+              void *data = addr->data;
+              char *tmp = data;
+              struct mem_block *next = (struct mem_block*)(tmp + addr->size);
+              next->size = addr->size - aligned_size - (2 * META_SIZE);
+              next->is_available = 1;
+              void *vb = addr;
+              tmp = vb;
+              next->data = tmp + META_SIZE;
+              next->next = addr->next;
+              addr->next = next;
+            }
         }
     }
     else
@@ -237,7 +239,6 @@ void *my_calloc(size_t nmemb, size_t size)
     call = memset(call, 0, align(size));
     return call;
 }
-
 
 void my_free(void *ptr)
 {
@@ -280,21 +281,3 @@ void free(void *ptr)
     return;
 }
 
-/*
-int main(void)
-{
-    for (int i = 0; i < 3000000; i++)
-    {
-        // printf("malloc number %d\n", i);
-        char *tmp = alloc(i);
-        if (tmp == NULL)
-        {
-            continue;
-        }
-        tmp[0] = 'c';
-        my_free(tmp);
-        // printf("Stopped after %d iterations\n", i);
-    }
-    return 0;
-}
-*/
