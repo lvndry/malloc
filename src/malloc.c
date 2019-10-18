@@ -58,6 +58,7 @@ static struct mem_block *find_block(
 
 static void split_block(struct mem_block *block, size_t free_size)
 {
+    pthread_mutex_lock(&foo_mutex);
     struct mem_block *next = (struct mem_block*)(block->data + block->size);
 
     next->size = align(free_size - block->size - (2 * META_SIZE));
@@ -66,16 +67,24 @@ static void split_block(struct mem_block *block, size_t free_size)
     char *tmp = addr;
     next->data = tmp + META_SIZE;
     next->next = block->next;
+    if (block->next != NULL)
+    {
+        block->next->prev = next;
+    }
+    next->prev = block;
     block->next = next;
+    pthread_mutex_unlock(&foo_mutex);
 }
 
 static void create_block(struct mem_block *block, size_t size)
 {
+    pthread_mutex_lock(&foo_mutex);
     block->size = size;
     block->is_available = 0;
     void *addr = block;
     char *tmp = addr;
     block->data = tmp + META_SIZE;
+    pthread_mutex_unlock(&foo_mutex);
 }
 
 static struct mem_block *getPage(struct mem_block *last, size_t map_size)
@@ -94,6 +103,7 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
     }
 
     struct mem_block *mapped_page = map_res;
+    mapped_page->prev = last;
 
     if (last != NULL)
     {
@@ -101,6 +111,14 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
     }
 
     return mapped_page;
+}
+
+void merge(struct mem_block *dest, struct mem_block *src)
+{
+    dest->size += (src->size + META_SIZE);
+    void *dest_addr = src->next;
+    dest->next = dest_addr;
+    // src = NULL;
 }
 
 static size_t getmappedsize(size_t size)
@@ -114,7 +132,6 @@ static size_t getmappedsize(size_t size)
 static void *alloc(size_t size)
 {
 
-    // pthread_mutex_lock(&foo_mutex);
     if (size == 0)
     {
         return NULL;
@@ -136,6 +153,7 @@ static void *alloc(size_t size)
         }
         create_block(block, aligned_size);
         block->next = NULL;
+        block->prev = NULL;
         if (map_size >= aligned_size + (2 * META_SIZE) + 80)
         {
             split_block(block, map_size);
@@ -167,6 +185,7 @@ static void *alloc(size_t size)
             }
             create_block(block, aligned_size);
             block->next = NULL;
+            block->prev = last;
             if (map_size >= aligned_size + (2 * META_SIZE))
             {
                 split_block(block, map_size);
@@ -174,7 +193,6 @@ static void *alloc(size_t size)
         }
     }
 
-    pthread_mutex_unlock(&foo_mutex);
     return (void*)block->data;
 }
 
@@ -194,17 +212,30 @@ void *my_realloc(void *ptr, size_t size)
     struct mem_block *addr = get_meta(ptr);
     if (addr->size >= size)
     {
+        /*
+        struct mem_block *next = (struct mem_block*)(addr->data + addr->size);
+        next->size = align(addr->size - size - META_SIZE);
+        next->is_available = 1;
+        void *def_next = next;
+        char *tmp = def_next;
+        next->data = tmp + META_SIZE;
+        next->next = addr->next;
+        if (addr->next != NULL)
+        {
+            addr->next->prev = next;
+        }
+        next->prev = addr;
+        addr->next = next;*/
         return ptr;
     }
 
     size_t aligned_size = align(size);
 
-    void *tmp = ptr;
-    ptr = alloc(size);
-    memcpy(ptr, tmp, aligned_size);
-    free(tmp);
+    void *tmp = alloc(size);
+    memcpy(tmp, ptr, aligned_size);
+    free(ptr);
 
-    return ptr;
+    return tmp;
 }
 
 void *my_calloc(size_t nmemb, size_t size)
@@ -231,6 +262,17 @@ void my_free(void *ptr)
     {
         struct mem_block *to_free = get_meta(ptr);
         to_free->is_available = 1;
+        /*
+        if (to_free->next != NULL && to_free->next->is_available)
+        {
+            merge(to_free, to_free->next);
+        }
+
+        if (to_free->prev != NULL && to_free->prev->is_available)
+        {
+            merge(to_free->prev, to_free);
+        }
+        */
     }
 
     return;
