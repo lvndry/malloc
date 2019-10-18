@@ -21,9 +21,14 @@ void move_data(struct mem_block *block, struct mem_block *dest, size_t size)
     dest->size -= size;
 }
 
-static size_t align(size_t n)
+static size_t align(size_t size)
 {
-    return (n + sizeof(size_t) - 1) & ~(sizeof(size_t) - 1);
+    if (size % 16 != 0)
+    {
+        size = ((size >> 4) << 4) + 16;
+    }
+
+    return size;
 }
 
 struct mem_block *get_meta(void *ptr)
@@ -91,6 +96,7 @@ static void create_block(struct mem_block *block, size_t size)
 
 static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 {
+    pthread_mutex_lock(&foo_mutex);
     void *map_res = mmap(
             NULL,
             map_size,
@@ -101,6 +107,7 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
 
     if (map_res == MAP_FAILED)
     {
+        pthread_mutex_unlock(&foo_mutex);
         return NULL;
     }
 
@@ -112,14 +119,18 @@ static struct mem_block *getPage(struct mem_block *last, size_t map_size)
         last->next = map_res;
     }
 
+    pthread_mutex_unlock(&foo_mutex);
     return mapped_page;
 }
 
 void merge(struct mem_block *dest, struct mem_block *src)
 {
+
+    pthread_mutex_lock(&foo_mutex);
     dest->size += (src->size + META_SIZE);
     void *dest_addr = src->next;
     dest->next = dest_addr;
+    pthread_mutex_unlock(&foo_mutex);
 }
 
 static size_t getmappedsize(size_t size)
@@ -176,21 +187,15 @@ static void *alloc(size_t size)
     else
     {
         last = first;
-        /* if (lfb->size >= size)
-        {
-            block = lfb;
-        }
-        else
-        {*/
-            block = find_block(first, &last, aligned_size);
-        // }
+        block = find_block(first, &last, aligned_size);
+
         if (block != NULL)
         {
             size_t remaining = block->size;
             create_block(block, aligned_size);
             if (block->size >= aligned_size + (2 * META_SIZE) + 80)
             {
-                /* lfb  = */ split_block(block, remaining);
+                split_block(block, remaining);
             }
         }
         else
@@ -229,9 +234,7 @@ void *my_realloc(void *ptr, size_t size)
     }
 
     struct mem_block *addr = get_meta(ptr);
-    if (addr->size >= size)
-    {
-    }
+    if (addr->size >= size) {}
 
     size_t aligned_size = align(size);
 
@@ -244,6 +247,12 @@ void *my_realloc(void *ptr, size_t size)
 
 void *my_calloc(size_t nmemb, size_t size)
 {
+    size_t res = 0;
+    if (__builtin_mul_overflow(nmemb, size, &res))
+    {
+        return NULL;
+    }
+
     char *call = alloc(nmemb * size);
     if (call == NULL)
     {
