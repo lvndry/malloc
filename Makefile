@@ -8,6 +8,7 @@ TARGET_LIB = libmalloc.so
 OBJS = malloc.o
 CALL_LIB = libtracemalloc.so
 CALL_OBJS = call_trace.o
+TEST_SRC=tests/tests.c
 
 all: $(TARGET_LIB)
 
@@ -18,6 +19,12 @@ $(TARGET_LIB): $(OBJS)
 debug: CFLAGS += -g
 debug: clean $(TARGET_LIB)
 
+compile_check:
+	$(CC) $(CFLAGS) $(TEST_SRC) -o tests
+
+check: compile_check
+	$(./tests)
+	
 trace: $(CALL_LIB)
 
 $(CALL_LIB): CPPFLAGS = -D_GNU_SOURCE

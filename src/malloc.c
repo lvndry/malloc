@@ -37,7 +37,8 @@ struct mem_block *get_meta(void *ptr)
 static int is_adress_valid(void *ptr)
 {
     struct mem_block *meta = get_meta(ptr);
-    return (void*)meta->data == ptr;
+    void *data = meta->data;
+    return data == ptr;
 }
 
 static struct mem_block *find_block(
@@ -56,11 +57,10 @@ static struct mem_block *find_block(
     return ptr;
 }
 
-static void split_block(struct mem_block *block, size_t free_size)
+static struct mem_block* split_block(struct mem_block *block, size_t free_size)
 {
     pthread_mutex_lock(&foo_mutex);
     struct mem_block *next = (struct mem_block*)(block->data + block->size);
-
     next->size = align(free_size - block->size - (2 * META_SIZE));
     next->is_available = 1;
     void *addr = next;
@@ -74,6 +74,8 @@ static void split_block(struct mem_block *block, size_t free_size)
     next->prev = block;
     block->next = next;
     pthread_mutex_unlock(&foo_mutex);
+
+    return next;
 }
 
 static void create_block(struct mem_block *block, size_t size)
@@ -118,7 +120,6 @@ void merge(struct mem_block *dest, struct mem_block *src)
     dest->size += (src->size + META_SIZE);
     void *dest_addr = src->next;
     dest->next = dest_addr;
-    // src = NULL;
 }
 
 static size_t getmappedsize(size_t size)
@@ -127,6 +128,15 @@ static size_t getmappedsize(size_t size)
     size_t n = ((size + META_SIZE) / len) + 1;
 
     return (n * PAGE_SIZE);
+}
+
+static void *get_first_of_page(void *ptr)
+{
+    uintptr_t add = (uintptr_t)ptr;
+    size_t tmp = add & (PAGE_SIZE - 1);
+    char *p = ptr;
+
+    return p - tmp;
 }
 
 static void *alloc(size_t size)
@@ -139,6 +149,7 @@ static void *alloc(size_t size)
 
     size_t aligned_size = align(size);
     static struct mem_block *first = NULL;
+    struct mem_block *lfb = NULL;
     struct mem_block *last = NULL;
     struct mem_block *block = NULL;
 
@@ -156,22 +167,30 @@ static void *alloc(size_t size)
         block->prev = NULL;
         if (map_size >= aligned_size + (2 * META_SIZE) + 80)
         {
-            split_block(block, map_size);
+            lfb = split_block(block, map_size);
         }
 
+        lfb = lfb;
         first = block;
     }
     else
     {
         last = first;
-        block = find_block(first, &last, aligned_size);
+        /* if (lfb->size >= size)
+        {
+            block = lfb;
+        }
+        else
+        {*/
+            block = find_block(first, &last, aligned_size);
+        // }
         if (block != NULL)
         {
             size_t remaining = block->size;
             create_block(block, aligned_size);
             if (block->size >= aligned_size + (2 * META_SIZE) + 80)
             {
-                split_block(block, remaining);
+                /* lfb  = */ split_block(block, remaining);
             }
         }
         else
@@ -212,21 +231,6 @@ void *my_realloc(void *ptr, size_t size)
     struct mem_block *addr = get_meta(ptr);
     if (addr->size >= size)
     {
-        /*
-        struct mem_block *next = (struct mem_block*)(addr->data + addr->size);
-        next->size = align(addr->size - size - META_SIZE);
-        next->is_available = 1;
-        void *def_next = next;
-        char *tmp = def_next;
-        next->data = tmp + META_SIZE;
-        next->next = addr->next;
-        if (addr->next != NULL)
-        {
-            addr->next->prev = next;
-        }
-        next->prev = addr;
-        addr->next = next;*/
-        return ptr;
     }
 
     size_t aligned_size = align(size);
@@ -262,17 +266,18 @@ void my_free(void *ptr)
     {
         struct mem_block *to_free = get_meta(ptr);
         to_free->is_available = 1;
-        /*
+
         if (to_free->next != NULL && to_free->next->is_available)
         {
-            merge(to_free, to_free->next);
+            if (get_first_of_page(to_free) == get_first_of_page(to_free->next))
+                merge(to_free, to_free->next);
         }
 
         if (to_free->prev != NULL && to_free->prev->is_available)
         {
-            merge(to_free->prev, to_free);
+            if (get_first_of_page(to_free) == get_first_of_page(to_free->prev))
+                merge(to_free->prev, to_free);
         }
-        */
     }
 
     return;

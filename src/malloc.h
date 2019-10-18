@@ -23,7 +23,7 @@ static size_t getmappedsize(size_t size);
 static struct mem_block *getPage(struct mem_block* last, size_t map_size);
 static int is_adress_valid(void *ptr);
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size);
-static void split_block(struct mem_block *block, size_t size);
+static struct mem_block* split_block(struct mem_block *block, size_t size);
 static struct mem_block *get_meta(void *ptr);
 
 void *alloc(size_t);
