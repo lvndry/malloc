@@ -11,7 +11,7 @@
 #define META_SIZE sizeof(struct mem_block)
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 
-static pthread_mutex_t foo_mutex = PTHREAD_MUTEX_INITIALIZER;
+// static pthread_mutex_t foo_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void move_data(struct mem_block *block, struct mem_block *dest, size_t size)
 {
@@ -76,8 +76,6 @@ static void create_block(struct mem_block *block, size_t size)
     void *addr = block;
     char *tmp = addr;
     block->data = tmp + META_SIZE;
-    // TODO verify this. Sometimes should not be to NULL
-    block->next = NULL;
 }
 
 static struct mem_block *getPage(struct mem_block *last, size_t map_size)
@@ -116,7 +114,7 @@ static size_t getmappedsize(size_t size)
 static void *alloc(size_t size)
 {
 
-    pthread_mutex_lock(&foo_mutex);
+    // pthread_mutex_lock(&foo_mutex);
     if (size == 0)
     {
         return NULL;
@@ -136,6 +134,7 @@ static void *alloc(size_t size)
             return NULL;
         }
         create_block(block, aligned_size);
+        block->next = NULL;
         if (map_size >= aligned_size + (2 * META_SIZE) + 80)
         {
             split_block(block, map_size);
@@ -165,6 +164,7 @@ static void *alloc(size_t size)
                 return NULL;
             }
             create_block(block, aligned_size);
+            block->next = NULL;
             if (map_size >= aligned_size + (2 * META_SIZE))
             {
                 split_block(block, map_size);
@@ -172,7 +172,7 @@ static void *alloc(size_t size)
         }
     }
 
-    pthread_mutex_unlock(&foo_mutex);
+    // pthread_mutex_unlock(&foo_mutex);
     return (void*)block->data;
 }
 
